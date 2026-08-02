@@ -1,0 +1,5 @@
+key,name,pin,kind,groupKeys,noticeKeys,canReadCongReports,canWriteCongMembers,canManagePublications,canReadContacts,canWriteContacts
+secretary,서기,2468,editor,*,cong|branch|week|groupnews|duty|visit|mid|talk|roster,true,true,true,true,true
+service,봉사 감독자,1357,editor,*,cong|groupnews|duty|visit|mid|talk,true,false,false,true,false
+group1-overseer,1집단 감독자,1111,editor,group1,groupnews,false,false,false,true,true
+group2-overseer,2집단 감독자,2222,editor,group2,groupnews,false,false,false,true,true

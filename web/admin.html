@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>야외 봉사 집단 도구 · 편집자 로그인</title>
+  </head>
+  <body>
+    <script>
+      var p = new URLSearchParams(location.search);
+      p.set('admin', '1');
+      location.replace('/?' + p.toString());
+    </script>
+    <noscript><a href="/?admin=1">편집자 로그인으로 이동</a></noscript>
+  </body>
+</html>

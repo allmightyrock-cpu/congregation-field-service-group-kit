@@ -1,0 +1,10 @@
+name = "congregation-fsg-kit-api"
+main = "src/index.js"
+compatibility_date = "2026-07-02"
+
+[vars]
+FIREBASE_PROJECT_ID = "YOUR_FIREBASE_PROJECT_ID"
+TOKEN_MODE = "signed"
+
+[triggers]
+crons = ["0 15 * * *"]

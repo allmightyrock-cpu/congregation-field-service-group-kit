@@ -1,0 +1,9 @@
+key,title,subtitle,order,visible,urgent
+cong,회중 광고,회중 전체에 내려온 안내,10,true,false
+branch,지부 광고 서신,첨부 문서,20,true,false
+groupnews,우리 집단 소식,집단별 안내,30,true,false
+duty,이 달의 봉사·청소 임명,회중 업무 진행요원 임명,40,true,false
+visit,봉사 감독자 방문,집단 방문 계획,50,true,false
+mid,평일 집회 임명표,평일 집회 임명,60,true,false
+talk,주말 성경공개강연,연제·연사,70,true,false
+roster,집단 편성표,야외 봉사 집단 편성,80,true,false

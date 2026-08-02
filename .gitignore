@@ -1,0 +1,12 @@
+.env
+*.env
+*.local
+service-account*.json
+sa.json
+firebase-service-account.json
+node_modules/
+dist/
+.firebase/
+.wrangler/
+*.log
+*.zip
