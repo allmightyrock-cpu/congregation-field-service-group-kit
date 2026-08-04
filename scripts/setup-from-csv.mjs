@@ -10,14 +10,14 @@ const templatesDir = process.env.TEMPLATE_DIR || resolve(ROOT, 'templates');
 const keyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
 if (!keyPath) {
-  throw new Error('GOOGLE_APPLICATION_CREDENTIALS environment variable must point to a Firebase service account JSON file.');
+  throw new Error('GOOGLE_APPLICATION_CREDENTIALS 환경 변수에 Firebase 서비스 계정 JSON 파일 경로를 지정해 주세요.');
 }
 
 const serviceAccount = JSON.parse(readFileSync(keyPath, 'utf8'));
 const projectId = process.env.FIREBASE_PROJECT_ID || serviceAccount.project_id;
 
 if (!projectId) {
-  throw new Error('FIREBASE_PROJECT_ID or serviceAccount.project_id is required.');
+  throw new Error('FIREBASE_PROJECT_ID 또는 서비스 계정 JSON의 project_id가 필요합니다.');
 }
 
 const accessToken = await getAccessToken(serviceAccount);
@@ -78,7 +78,7 @@ function toValue(v) {
   if (typeof v === 'string') return { stringValue: v };
   if (Array.isArray(v)) return { arrayValue: { values: v.map(toValue) } };
   if (typeof v === 'object') return { mapValue: { fields: toFields(v) } };
-  throw new Error(`unsupported type: ${typeof v}`);
+  throw new Error(`지원하지 않는 값 형식입니다: ${typeof v}`);
 }
 
 function toFields(obj) {
@@ -188,4 +188,4 @@ for (const r of roles) {
   });
 }
 
-console.log(`Setup complete: Firebase project=${projectId}, groups=${groups.length}, members=${members.length}, roles=${roles.length}, notices=${notices.length}`);
+console.log(`초기 설정 완료: Firebase project=${projectId}, groups=${groups.length}, members=${members.length}, roles=${roles.length}, notices=${notices.length}`);

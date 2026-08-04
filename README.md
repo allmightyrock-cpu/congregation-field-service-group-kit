@@ -4,11 +4,26 @@
 
 ## 주요 기능
 
-- 집단별 성원 보고 및 집계
+- 집단별 성원 보고와 회중 전체 집계
 - 회중 광고, 지부 광고 서신, 집단 소식 관리
 - 집단 편성표, 봉사·청소 임명, 봉사 감독자 방문, 집회 임명표, 공개강연 안내
 - 역할별 PIN 로그인과 권한 분리
 - 모바일 사용에 맞춘 웹 화면
+
+## 가장 쉬운 설치 방법
+
+Windows에서는 배포본 폴더의 아래 파일을 더블 클릭합니다.
+
+```text
+쉬운설치.cmd
+```
+
+설치 마법사가 Firebase/Cloudflare 설정값을 질문하고, 필요한 파일 생성과 배포 명령을 순서대로 진행합니다.
+
+자세한 안내:
+
+- [docs/쉬운_설치_마법사.md](docs/쉬운_설치_마법사.md)
+- [INSTALL.md](INSTALL.md)
 
 ## 구성
 
@@ -17,19 +32,8 @@
 - `shared/`: 웹과 Worker가 함께 쓰는 공통 로직
 - `templates/`: 처음 설치할 때 가져올 CSV 예제 데이터
 - `scripts/setup-from-csv.mjs`: CSV 예제 데이터를 Firestore에 넣는 초기 설정 스크립트
+- `scripts/easy-install.ps1`: 쉬운 설치 마법사
 - `docs/`: 설치와 운영 안내 문서
-
-## 빠른 시작
-
-자세한 순서는 [INSTALL.md](INSTALL.md)를 따라가면 됩니다.
-
-1. Firebase 프로젝트를 만들고 Firestore를 준비합니다.
-2. Cloudflare 계정에서 Worker와 Pages 배포를 준비합니다.
-3. `web/.env.example`을 `web/.env`로 복사한 뒤 Firebase 웹 설정값을 입력합니다.
-4. `worker/wrangler.toml`의 `FIREBASE_PROJECT_ID`를 자기 프로젝트 ID로 바꿉니다.
-5. `templates/*.csv`를 자기 회중 자료로 수정합니다.
-6. `node scripts/setup-from-csv.mjs`로 초기 데이터를 넣습니다.
-7. Worker와 웹 앱을 배포합니다.
 
 ## 배포 자료 받기
 
