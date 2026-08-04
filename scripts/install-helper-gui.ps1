@@ -207,7 +207,7 @@ Add-Label $tabCloud (Txt "worker_name") 30 88
 $txtWorker = Add-Text $tabCloud 260 86 430 "congregation-fsg-kit-api"
 Add-Label $tabCloud (Txt "pages_name") 30 134
 $txtPages = Add-Text $tabCloud 260 132 430 "congregation-field-service-group-kit"
-Add-Label $tabCloud "Worker URL" 30 180
+Add-Label $tabCloud "설치 후 서버 주소" 30 180
 $txtWorkerUrl = Add-Text $tabCloud 260 178 500 "https://congregation-fsg-kit-api.YOUR_SUBDOMAIN.workers.dev"
 
 $tabRun = Add-Tab $tabs (Txt "tab_run")

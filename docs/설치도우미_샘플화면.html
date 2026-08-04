@@ -101,8 +101,8 @@
       <span class="traffic"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>
     </div>
     <div class="wrap">
-      <h1>Firebase 설정값은 복사해서 붙여 넣기</h1>
-      <p class="lead">Firebase 콘솔에서 웹 앱을 등록하면 아래 값을 확인할 수 있습니다. 설치 도우미는 이 값을 받아 `web/.env` 파일을 자동으로 만듭니다.</p>
+      <h1>Firebase에서 값 5개 복사하기</h1>
+      <p class="lead">사용자는 Firebase 화면에서 보이는 값을 그대로 복사해 전달하면 됩니다. 설치 담당자가 나머지 설정을 처리합니다.</p>
       <div class="tabs">
         <div class="tab">1 기본 정보</div>
         <div class="tab">2 집단 이름</div>
@@ -112,7 +112,7 @@
       </div>
       <div class="panel split">
         <div>
-          <div class="hint">프로젝트 설정 > 일반 > 내 앱 > 웹 앱 > SDK 설정 및 구성 > 구성(Config)에 표시된 값만 옮겨 적습니다.</div>
+          <div class="hint">Firebase 콘솔에서 프로젝트 설정 > 일반 > 내 앱 > 웹 앱 > Config 화면을 엽니다. 아래 5개 값만 복사합니다.</div>
           <div class="row"><label>apiKey</label><input value="AIzaSy..."></div>
           <div class="row"><label>authDomain</label><input value="sample-field-service.firebaseapp.com"></div>
           <div class="row"><label>storageBucket</label><input value="sample-field-service.appspot.com"></div>
@@ -144,8 +144,8 @@
       <span class="traffic"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>
     </div>
     <div class="wrap">
-      <h1>Cloudflare는 Worker와 Pages로 나눠 배포</h1>
-      <p class="lead">Cloudflare의 Workers & Pages 메뉴 안에서 두 가지가 사용됩니다. Worker는 PIN 로그인용 서버이고, Pages는 성원들이 보는 웹사이트입니다.</p>
+      <h1>Cloudflare에서 사용할 이름 정하기</h1>
+      <p class="lead">사용자는 Cloudflare 계정을 준비하고 이름 2개만 정하면 됩니다. 설치 담당자가 배포를 진행합니다.</p>
       <div class="tabs">
         <div class="tab">1 기본 정보</div>
         <div class="tab">2 집단 이름</div>
@@ -155,28 +155,24 @@
       </div>
       <div class="panel split">
         <div>
-          <div class="hint">먼저 Cloudflare 계정을 만들고 대시보드의 Workers & Pages 메뉴를 찾습니다. 설치 도우미에서는 이름만 정하면 됩니다.</div>
-          <div class="row"><label>Worker 이름</label><input value="sample-field-service-api"></div>
-          <div class="row"><label>Pages 프로젝트</label><input value="sample-field-service"></div>
-          <div class="row"><label>Worker 주소</label><input value="https://sample-field-service-api.workers.dev"></div>
+          <div class="hint">Cloudflare 대시보드에 로그인할 수 있으면 됩니다. 아래 이름 2개는 영문 소문자, 숫자, 하이픈으로 정합니다.</div>
+          <div class="row"><label>서버용 이름</label><input value="sample-field-service-api"></div>
+          <div class="row"><label>웹사이트용 이름</label><input value="sample-field-service"></div>
+          <div class="row"><label>설치 후 주소</label><input value="https://sample-field-service.pages.dev"></div>
           <div class="summary">
-            <div class="card"><b>Secret</b><span class="muted">FIREBASE_SERVICE_ACCOUNT</span></div>
-            <div class="card"><b>API</b><span class="muted">PIN 로그인 처리</span></div>
-            <div class="card"><b>Pages</b><span class="muted">웹 화면 배포</span></div>
+            <div class="card"><b>필요한 것</b><span class="muted">Cloudflare 로그인</span></div>
+            <div class="card"><b>정할 것</b><span class="muted">이름 2개</span></div>
+            <div class="card"><b>설치 후</b><span class="muted">주소 전달</span></div>
           </div>
         </div>
         <div class="guide">
           <h2>처음이면 여기부터</h2>
           <div class="code">https://dash.cloudflare.com/</div>
           <div class="step"><span class="num">1</span><span>구글에서 <b>Cloudflare dashboard</b> 또는 <b>Cloudflare 대시보드</b>를 검색해도 됩니다.</span></div>
-          <div class="step"><span class="num">2</span><span>로그인 후 <b>Workers & Pages</b> 메뉴를 찾습니다.</span></div>
-          <div class="step"><span class="num">3</span><span>Worker는 서버 작업, Pages는 웹 화면이라는 점만 구분하면 됩니다.</span></div>
-          <div class="step"><span class="num">4</span><span>설치 도우미가 `wrangler.toml`의 Worker 이름과 Firebase Project ID를 채웁니다.</span></div>
-          <div class="step"><span class="num">5</span><span>서비스 계정 JSON은 Worker secret으로 등록됩니다.</span></div>
-          <div class="code">wrangler secret put FIREBASE_SERVICE_ACCOUNT</div>
-          <div class="step"><span class="num">6</span><span>Worker를 먼저 배포하고, 그 주소를 웹 앱 환경값에 연결합니다.</span></div>
-          <div class="step"><span class="num">7</span><span>마지막으로 Pages에 성원용 화면을 배포합니다.</span></div>
-          <div class="note"><span class="pill">중요</span>Cloudflare 로그인 승인 창은 사용자가 직접 확인해야 합니다.</div>
+          <div class="step"><span class="num">2</span><span>회원가입과 이메일 인증을 완료합니다.</span></div>
+          <div class="step"><span class="num">3</span><span>설치할 때 로그인 승인 창이 나오면 본인이 직접 승인합니다.</span></div>
+          <div class="step"><span class="num">4</span><span>서버용 이름과 웹사이트용 이름을 설치 담당자에게 전달합니다.</span></div>
+          <div class="note"><span class="pill">중요</span>비밀번호는 문서에 적어 보내지 말고, 설치 중 직접 입력하거나 승인하세요.</div>
         </div>
       </div>
       <div class="actions">
