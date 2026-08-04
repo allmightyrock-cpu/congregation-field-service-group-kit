@@ -58,7 +58,7 @@ function Run-Step($label, $scriptBlock) {
   & $scriptBlock
 }
 
-Write-Host "Congregation Field Service Group Kit - Easy Install Wizard" -ForegroundColor Green
+Write-Host "Congregation Field Service Group Kit - Easy Install Helper" -ForegroundColor Green
 Write-Host "You may need to approve Firebase and Cloudflare login screens during setup."
 
 Run-Step "Checking required tools" {
@@ -179,7 +179,7 @@ if (-not $SkipDeploy) {
 }
 
 Write-Step "Done"
-Write-Host "The easy install wizard has finished." -ForegroundColor Green
+Write-Host "The easy install helper has finished." -ForegroundColor Green
 Write-Host "Home: https://YOUR_PAGES_DOMAIN/"
 Write-Host "Group 1: https://YOUR_PAGES_DOMAIN/?g=group1"
 Write-Host "Admin: https://YOUR_PAGES_DOMAIN/admin.html"

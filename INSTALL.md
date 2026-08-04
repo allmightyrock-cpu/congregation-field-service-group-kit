@@ -2,7 +2,7 @@
 
 이 문서는 처음 설치하는 회중이 `Congregation Field Service Group Kit`를 자기 환경에 배포하는 순서입니다.
 
-## 추천: 쉬운 설치 마법사 사용
+## 추천: 쉬운 설치 도우미 사용
 
 Windows 사용자는 배포본 폴더에서 아래 파일을 더블 클릭하세요.
 
@@ -10,7 +10,7 @@ Windows 사용자는 배포본 폴더에서 아래 파일을 더블 클릭하세
 쉬운설치.cmd
 ```
 
-설치 마법사가 아래 작업을 순서대로 도와줍니다.
+설치 도우미가 아래 작업을 순서대로 도와줍니다.
 
 - Firebase 웹 설정값으로 `web/.env` 생성
 - `worker/wrangler.toml` 자동 수정
@@ -22,7 +22,7 @@ Windows 사용자는 배포본 폴더에서 아래 파일을 더블 클릭하세
 - Worker 배포
 - 웹 앱 빌드와 Cloudflare Pages 배포
 
-자세한 설명은 [docs/쉬운_설치_마법사.md](docs/쉬운_설치_마법사.md)를 참고하세요.
+자세한 설명은 [docs/쉬운_설치_도우미.md](docs/쉬운_설치_도우미.md)를 참고하세요.
 
 ## 1. 준비물
 
@@ -60,7 +60,7 @@ npm -v
 
 자세한 형식은 [docs/초기데이터_작성법.md](docs/초기데이터_작성법.md)를 참고하세요.
 
-## 4. 쉬운 설치 마법사 실행
+## 4. 쉬운 설치 도우미 실행
 
 배포본 폴더에서 실행합니다.
 
@@ -70,7 +70,7 @@ powershell -ExecutionPolicy Bypass -File scripts/easy-install.ps1
 
 또는 `쉬운설치.cmd`를 더블 클릭합니다.
 
-마법사가 질문하는 값:
+설치 도우미가 질문하는 값:
 
 - 회중 이름
 - Firebase Project ID
