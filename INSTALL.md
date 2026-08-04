@@ -23,6 +23,7 @@ Windows 사용자는 배포본 폴더에서 아래 파일을 더블 클릭하세
 - 웹 앱 빌드와 Cloudflare Pages 배포
 
 자세한 설명은 [docs/쉬운_설치_도우미.md](docs/쉬운_설치_도우미.md)를 참고하세요.
+Firebase와 Cloudflare 설정값을 찾는 방법은 [docs/Firebase_Cloudflare_설정_상세안내.md](docs/Firebase_Cloudflare_설정_상세안내.md)를 참고하세요.
 샘플 화면은 [docs/설치도우미_샘플화면.html](docs/설치도우미_샘플화면.html)에서 볼 수 있습니다.
 
 ## 1. 준비물

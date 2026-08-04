@@ -5,38 +5,61 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>설치 도우미 샘플 화면</title>
   <style>
-    body { margin: 0; font-family: "Malgun Gothic", Arial, sans-serif; background: #eef2f6; color: #17202a; }
-    .window { width: 980px; margin: 28px auto; background: #f8fafc; border: 1px solid #cfd8e3; box-shadow: 0 18px 50px rgba(15, 23, 42, .18); border-radius: 10px; overflow: hidden; }
-    .bar { height: 42px; background: #ffffff; border-bottom: 1px solid #d7dee8; display: flex; align-items: center; padding: 0 18px; font-weight: 700; }
+    :root {
+      --green: #0b7f46;
+      --line: #d8e1ec;
+      --soft: #f4f8fb;
+      --text: #17202a;
+      --muted: #607184;
+      --amber: #9a5b00;
+      --blue: #245c9a;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Malgun Gothic", Arial, sans-serif; background: #eef2f6; color: var(--text); }
+    .window { width: 1040px; margin: 28px auto; background: #f8fafc; border: 1px solid #cfd8e3; box-shadow: 0 18px 50px rgba(15, 23, 42, .18); border-radius: 10px; overflow: hidden; }
+    .bar { height: 42px; background: #ffffff; border-bottom: 1px solid #d7dee8; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; font-weight: 700; }
+    .traffic { display: flex; gap: 8px; }
+    .dot { width: 11px; height: 11px; border-radius: 999px; background: #d3dde9; }
     .wrap { padding: 24px 28px 28px; }
-    h1 { font-size: 28px; margin: 0 0 8px; }
-    .lead { color: #5b6b7d; margin: 0 0 22px; }
-    .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    h1 { font-size: 28px; margin: 0 0 8px; letter-spacing: 0; }
+    .lead { color: var(--muted); margin: 0 0 22px; line-height: 1.55; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
     .tab { padding: 10px 16px; border-radius: 8px; background: #e8eef5; color: #506173; font-weight: 700; }
-    .tab.on { background: #0b7f46; color: #fff; }
-    .panel { background: #fff; border: 1px solid #dbe3ed; border-radius: 8px; padding: 24px; min-height: 360px; }
-    .hint { background: #f2f8f5; border-left: 4px solid #0b7f46; padding: 12px 14px; color: #3a4a58; margin-bottom: 20px; }
+    .tab.on { background: var(--green); color: #fff; }
+    .panel { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 24px; min-height: 380px; }
+    .hint { background: #f2f8f5; border-left: 4px solid var(--green); padding: 12px 14px; color: #3a4a58; margin-bottom: 20px; line-height: 1.55; }
+    .split { display: grid; grid-template-columns: 1.05fr .95fr; gap: 22px; align-items: start; }
     .row { display: grid; grid-template-columns: 190px 1fr; align-items: center; gap: 18px; margin: 14px 0; }
     label { font-weight: 700; }
-    input, select { height: 38px; border: 1px solid #cbd5e1; border-radius: 7px; padding: 0 12px; font-size: 15px; }
+    input, select { width: 100%; height: 38px; border: 1px solid #cbd5e1; border-radius: 7px; padding: 0 12px; font-size: 15px; background: #fff; }
     .groups { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; margin-top: 8px; }
     .groupbox { display: grid; grid-template-columns: 95px 1fr; align-items: center; gap: 10px; }
+    .guide { border: 1px solid var(--line); border-radius: 8px; padding: 16px; background: #fbfdff; }
+    .guide h2 { font-size: 18px; margin: 0 0 12px; }
+    .step { display: grid; grid-template-columns: 28px 1fr; gap: 10px; margin: 11px 0; line-height: 1.5; }
+    .num { width: 24px; height: 24px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: #eaf5ef; color: var(--green); font-weight: 800; }
+    .code { font-family: Consolas, "Courier New", monospace; background: #f1f5f9; border: 1px solid #dce5ef; border-radius: 6px; padding: 8px 10px; margin-top: 6px; color: #25364a; }
+    .pill { display: inline-block; border-radius: 999px; padding: 3px 9px; font-size: 12px; font-weight: 800; background: #eaf2ff; color: var(--blue); margin-right: 6px; }
+    .note { color: var(--amber); background: #fff8eb; border: 1px solid #f1d8a4; border-radius: 7px; padding: 10px 12px; margin-top: 14px; line-height: 1.5; }
     .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
     button { border: 0; border-radius: 7px; padding: 10px 18px; font-weight: 800; font-size: 15px; }
     .secondary { background: #e8eef5; color: #263445; }
-    .primary { background: #0b7f46; color: #fff; }
+    .primary { background: var(--green); color: #fff; }
     .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
-    .card { border: 1px solid #dbe3ed; border-radius: 8px; padding: 14px; background: #fbfdff; }
+    .card { border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: #fbfdff; }
     .card b { display: block; margin-bottom: 6px; }
     .muted { color: #66788a; font-size: 14px; }
   </style>
 </head>
 <body>
   <div class="window">
-    <div class="bar">Congregation Field Service Group Kit - 설치 도우미</div>
+    <div class="bar">
+      <span>Congregation Field Service Group Kit - 설치 도우미</span>
+      <span class="traffic"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>
+    </div>
     <div class="wrap">
       <h1>회중 야외 봉사 집단 프로그램 설치 도우미</h1>
-      <p class="lead">처음에는 집단 이름만 정합니다. 성원 명단은 설치 후 감독자/보조자 또는 서기가 입력할 수 있습니다.</p>
+      <p class="lead">처음에는 집단 이름만 정합니다. 성원 명단은 설치 후 감독자/보조자 또는 서기가 직접 입력하거나 엑셀 표로 한꺼번에 등록할 수 있습니다.</p>
       <div class="tabs">
         <div class="tab">1 기본 정보</div>
         <div class="tab on">2 집단 이름</div>
@@ -59,7 +82,7 @@
           <div class="groupbox"><label>6 번째</label><input value="6집단"></div>
         </div>
         <div class="summary">
-          <div class="card"><b>성원 명단</b><span class="muted">처음에는 비워 둡니다.</span></div>
+          <div class="card"><b>성원 명단</b><span class="muted">처음에는 비워 둡니다</span></div>
           <div class="card"><b>역할 PIN</b><span class="muted">1111-5555 기본값 생성</span></div>
           <div class="card"><b>집단 PIN</b><span class="muted">감독자/보조자 0000</span></div>
         </div>
@@ -68,6 +91,92 @@
         <button class="secondary">이전</button>
         <button class="secondary">다음</button>
         <button class="primary">준비 파일 만들기</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="window">
+    <div class="bar">
+      <span>Firebase 값 입력 화면</span>
+      <span class="traffic"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>
+    </div>
+    <div class="wrap">
+      <h1>Firebase 설정값은 복사해서 붙여 넣기</h1>
+      <p class="lead">Firebase 콘솔에서 웹 앱을 등록하면 아래 값을 확인할 수 있습니다. 설치 도우미는 이 값을 받아 `web/.env` 파일을 자동으로 만듭니다.</p>
+      <div class="tabs">
+        <div class="tab">1 기본 정보</div>
+        <div class="tab">2 집단 이름</div>
+        <div class="tab on">3 Firebase</div>
+        <div class="tab">4 Cloudflare</div>
+        <div class="tab">5 실행</div>
+      </div>
+      <div class="panel split">
+        <div>
+          <div class="hint">프로젝트 설정 > 일반 > 내 앱 > 웹 앱 > SDK 설정 및 구성 > 구성(Config)에 표시된 값만 옮겨 적습니다.</div>
+          <div class="row"><label>apiKey</label><input value="AIzaSy..."></div>
+          <div class="row"><label>authDomain</label><input value="sample-field-service.firebaseapp.com"></div>
+          <div class="row"><label>storageBucket</label><input value="sample-field-service.appspot.com"></div>
+          <div class="row"><label>messagingSenderId</label><input value="123456789012"></div>
+          <div class="row"><label>appId</label><input value="1:123456789012:web:abcdef123456"></div>
+        </div>
+        <div class="guide">
+          <h2>화면에서 따라 할 순서</h2>
+          <div class="step"><span class="num">1</span><span>Firebase 콘솔에서 새 프로젝트를 만듭니다.</span></div>
+          <div class="step"><span class="num">2</span><span>프로젝트 설정의 <b>일반</b> 탭에서 웹 앱을 추가합니다.</span></div>
+          <div class="step"><span class="num">3</span><span>Config 코드에 있는 `apiKey`, `projectId`, `appId` 등의 값을 복사합니다.</span></div>
+          <div class="step"><span class="num">4</span><span>서비스 계정 탭에서 비공개 키 JSON 파일을 내려받아 기본 정보 화면에 선택합니다.</span></div>
+          <div class="note">서비스 계정 JSON은 비밀번호처럼 다룹니다. GitHub나 카페 글에 첨부하지 않습니다.</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="secondary">이전</button>
+        <button class="secondary">다음</button>
+        <button class="primary">값 확인</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="window">
+    <div class="bar">
+      <span>Cloudflare 배포 설정 화면</span>
+      <span class="traffic"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>
+    </div>
+    <div class="wrap">
+      <h1>Cloudflare는 Worker와 Pages로 나눠 배포</h1>
+      <p class="lead">Worker는 PIN 로그인과 서버 작업을 담당하고, Pages는 성원들이 접속하는 웹 화면을 담당합니다. 이름만 정하면 설치 도우미가 필요한 파일을 맞춰 줍니다.</p>
+      <div class="tabs">
+        <div class="tab">1 기본 정보</div>
+        <div class="tab">2 집단 이름</div>
+        <div class="tab">3 Firebase</div>
+        <div class="tab on">4 Cloudflare</div>
+        <div class="tab">5 실행</div>
+      </div>
+      <div class="panel split">
+        <div>
+          <div class="hint">Cloudflare 계정으로 로그인한 뒤 사용할 이름을 정합니다. 영문 소문자, 숫자, 하이픈을 권장합니다.</div>
+          <div class="row"><label>Worker 이름</label><input value="sample-field-service-api"></div>
+          <div class="row"><label>Pages 프로젝트</label><input value="sample-field-service"></div>
+          <div class="row"><label>Worker 주소</label><input value="https://sample-field-service-api.workers.dev"></div>
+          <div class="summary">
+            <div class="card"><b>Secret</b><span class="muted">FIREBASE_SERVICE_ACCOUNT</span></div>
+            <div class="card"><b>API</b><span class="muted">PIN 로그인 처리</span></div>
+            <div class="card"><b>Pages</b><span class="muted">웹 화면 배포</span></div>
+          </div>
+        </div>
+        <div class="guide">
+          <h2>Cloudflare에서 진행되는 일</h2>
+          <div class="step"><span class="num">1</span><span>설치 도우미가 `wrangler.toml`의 Worker 이름과 Firebase Project ID를 채웁니다.</span></div>
+          <div class="step"><span class="num">2</span><span>서비스 계정 JSON은 Worker secret으로 등록됩니다.</span></div>
+          <div class="code">wrangler secret put FIREBASE_SERVICE_ACCOUNT</div>
+          <div class="step"><span class="num">3</span><span>Worker를 먼저 배포하고, 그 주소를 웹 앱 환경값에 연결합니다.</span></div>
+          <div class="step"><span class="num">4</span><span>마지막으로 Pages에 성원용 화면을 배포합니다.</span></div>
+          <div class="note"><span class="pill">중요</span>Cloudflare 로그인 승인 창은 사용자가 직접 확인해야 합니다.</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="secondary">이전</button>
+        <button class="secondary">다음</button>
+        <button class="primary">배포 준비</button>
       </div>
     </div>
   </div>

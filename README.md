@@ -24,6 +24,7 @@ Windows에서는 배포본 폴더의 아래 파일을 더블 클릭합니다.
 자세한 안내:
 
 - [docs/쉬운_설치_도우미.md](docs/쉬운_설치_도우미.md)
+- [docs/Firebase_Cloudflare_설정_상세안내.md](docs/Firebase_Cloudflare_설정_상세안내.md)
 - [docs/설치도우미_샘플화면.html](docs/설치도우미_샘플화면.html)
 - [INSTALL.md](INSTALL.md)
 
