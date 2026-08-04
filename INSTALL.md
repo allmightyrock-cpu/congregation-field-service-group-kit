@@ -35,6 +35,15 @@ Firebase와 Cloudflare 설정값을 찾는 방법은 [docs/Firebase_Cloudflare_�
 - Firebase 서비스 계정 JSON 파일
 - 회중 집단/성원 자료
 
+처음 사용하는 분은 먼저 아래 주소에서 계정을 준비하세요.
+
+- Firebase 공식 사이트: `https://firebase.google.com/`
+- Firebase 콘솔: `https://console.firebase.google.com/`
+- Cloudflare 공식 사이트: `https://www.cloudflare.com/`
+- Cloudflare 대시보드: `https://dash.cloudflare.com/`
+
+구글에서 찾을 때는 `Firebase 콘솔`, `Cloudflare dashboard`, `Cloudflare 대시보드`로 검색하면 됩니다.
+
 설치 확인:
 
 ```powershell
@@ -48,6 +57,8 @@ npm -v
 2. Firestore Database를 생성합니다.
 3. 프로젝트 설정에서 웹 앱을 추가하고 Firebase SDK 설정값을 확인합니다.
 4. 프로젝트 설정 > 서비스 계정에서 새 비공개 키 JSON을 내려받습니다.
+
+Firebase를 처음 쓰는 경우에는 [docs/Firebase_Cloudflare_설정_상세안내.md](docs/Firebase_Cloudflare_설정_상세안내.md)의 1-5번 순서를 먼저 따라 하세요.
 
 주의: 서비스 계정 JSON은 절대로 GitHub나 카페에 올리지 마세요.
 
@@ -81,6 +92,13 @@ powershell -ExecutionPolicy Bypass -File scripts/easy-install.ps1
 - Cloudflare Pages 프로젝트 이름
 - Firebase 웹 앱 설정값
 - Worker URL
+
+Cloudflare를 처음 쓰는 경우에는 Worker와 Pages를 직접 복잡하게 만들려고 하지 말고, 먼저 이름만 정하세요.
+
+- Worker: PIN 로그인과 서버 작업을 처리하는 쪽
+- Pages: 성원들이 접속하는 웹 화면
+
+설치 도우미가 Worker 설정 파일과 Pages 배포 명령을 순서대로 준비합니다. 자세한 설명은 [docs/Firebase_Cloudflare_설정_상세안내.md](docs/Firebase_Cloudflare_설정_상세안내.md)의 6-11번을 참고하세요.
 
 ## 5. 접속 주소 예시
 

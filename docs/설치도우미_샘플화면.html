@@ -120,11 +120,13 @@
           <div class="row"><label>appId</label><input value="1:123456789012:web:abcdef123456"></div>
         </div>
         <div class="guide">
-          <h2>화면에서 따라 할 순서</h2>
-          <div class="step"><span class="num">1</span><span>Firebase 콘솔에서 새 프로젝트를 만듭니다.</span></div>
-          <div class="step"><span class="num">2</span><span>프로젝트 설정의 <b>일반</b> 탭에서 웹 앱을 추가합니다.</span></div>
-          <div class="step"><span class="num">3</span><span>Config 코드에 있는 `apiKey`, `projectId`, `appId` 등의 값을 복사합니다.</span></div>
-          <div class="step"><span class="num">4</span><span>서비스 계정 탭에서 비공개 키 JSON 파일을 내려받아 기본 정보 화면에 선택합니다.</span></div>
+          <h2>처음이면 여기부터</h2>
+          <div class="code">https://console.firebase.google.com/</div>
+          <div class="step"><span class="num">1</span><span>구글에서 <b>Firebase 콘솔</b> 또는 <b>Firebase console</b>을 검색해도 됩니다.</span></div>
+          <div class="step"><span class="num">2</span><span>프로젝트 추가를 누르고 Firestore Database를 만듭니다.</span></div>
+          <div class="step"><span class="num">3</span><span>프로젝트 설정의 <b>일반</b> 탭에서 웹 앱을 추가합니다.</span></div>
+          <div class="step"><span class="num">4</span><span>Config 코드에 있는 `apiKey`, `projectId`, `appId` 등의 값을 복사합니다.</span></div>
+          <div class="step"><span class="num">5</span><span>서비스 계정 탭에서 비공개 키 JSON 파일을 내려받아 기본 정보 화면에 선택합니다.</span></div>
           <div class="note">서비스 계정 JSON은 비밀번호처럼 다룹니다. GitHub나 카페 글에 첨부하지 않습니다.</div>
         </div>
       </div>
@@ -143,7 +145,7 @@
     </div>
     <div class="wrap">
       <h1>Cloudflare는 Worker와 Pages로 나눠 배포</h1>
-      <p class="lead">Worker는 PIN 로그인과 서버 작업을 담당하고, Pages는 성원들이 접속하는 웹 화면을 담당합니다. 이름만 정하면 설치 도우미가 필요한 파일을 맞춰 줍니다.</p>
+      <p class="lead">Cloudflare의 Workers & Pages 메뉴 안에서 두 가지가 사용됩니다. Worker는 PIN 로그인용 서버이고, Pages는 성원들이 보는 웹사이트입니다.</p>
       <div class="tabs">
         <div class="tab">1 기본 정보</div>
         <div class="tab">2 집단 이름</div>
@@ -153,7 +155,7 @@
       </div>
       <div class="panel split">
         <div>
-          <div class="hint">Cloudflare 계정으로 로그인한 뒤 사용할 이름을 정합니다. 영문 소문자, 숫자, 하이픈을 권장합니다.</div>
+          <div class="hint">먼저 Cloudflare 계정을 만들고 대시보드의 Workers & Pages 메뉴를 찾습니다. 설치 도우미에서는 이름만 정하면 됩니다.</div>
           <div class="row"><label>Worker 이름</label><input value="sample-field-service-api"></div>
           <div class="row"><label>Pages 프로젝트</label><input value="sample-field-service"></div>
           <div class="row"><label>Worker 주소</label><input value="https://sample-field-service-api.workers.dev"></div>
@@ -164,12 +166,16 @@
           </div>
         </div>
         <div class="guide">
-          <h2>Cloudflare에서 진행되는 일</h2>
-          <div class="step"><span class="num">1</span><span>설치 도우미가 `wrangler.toml`의 Worker 이름과 Firebase Project ID를 채웁니다.</span></div>
-          <div class="step"><span class="num">2</span><span>서비스 계정 JSON은 Worker secret으로 등록됩니다.</span></div>
+          <h2>처음이면 여기부터</h2>
+          <div class="code">https://dash.cloudflare.com/</div>
+          <div class="step"><span class="num">1</span><span>구글에서 <b>Cloudflare dashboard</b> 또는 <b>Cloudflare 대시보드</b>를 검색해도 됩니다.</span></div>
+          <div class="step"><span class="num">2</span><span>로그인 후 <b>Workers & Pages</b> 메뉴를 찾습니다.</span></div>
+          <div class="step"><span class="num">3</span><span>Worker는 서버 작업, Pages는 웹 화면이라는 점만 구분하면 됩니다.</span></div>
+          <div class="step"><span class="num">4</span><span>설치 도우미가 `wrangler.toml`의 Worker 이름과 Firebase Project ID를 채웁니다.</span></div>
+          <div class="step"><span class="num">5</span><span>서비스 계정 JSON은 Worker secret으로 등록됩니다.</span></div>
           <div class="code">wrangler secret put FIREBASE_SERVICE_ACCOUNT</div>
-          <div class="step"><span class="num">3</span><span>Worker를 먼저 배포하고, 그 주소를 웹 앱 환경값에 연결합니다.</span></div>
-          <div class="step"><span class="num">4</span><span>마지막으로 Pages에 성원용 화면을 배포합니다.</span></div>
+          <div class="step"><span class="num">6</span><span>Worker를 먼저 배포하고, 그 주소를 웹 앱 환경값에 연결합니다.</span></div>
+          <div class="step"><span class="num">7</span><span>마지막으로 Pages에 성원용 화면을 배포합니다.</span></div>
           <div class="note"><span class="pill">중요</span>Cloudflare 로그인 승인 창은 사용자가 직접 확인해야 합니다.</div>
         </div>
       </div>
