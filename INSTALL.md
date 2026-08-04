@@ -10,7 +10,7 @@ Windows 사용자는 배포본 폴더에서 아래 파일을 더블 클릭하세
 쉬운설치.cmd
 ```
 
-설치 도우미가 아래 작업을 순서대로 도와줍니다.
+설치 도우미는 단계별 입력 화면으로 아래 작업을 순서대로 도와줍니다.
 
 - Firebase 웹 설정값으로 `web/.env` 생성
 - `worker/wrangler.toml` 자동 수정
@@ -23,6 +23,7 @@ Windows 사용자는 배포본 폴더에서 아래 파일을 더블 클릭하세
 - 웹 앱 빌드와 Cloudflare Pages 배포
 
 자세한 설명은 [docs/쉬운_설치_도우미.md](docs/쉬운_설치_도우미.md)를 참고하세요.
+샘플 화면은 [docs/설치도우미_샘플화면.html](docs/설치도우미_샘플화면.html)에서 볼 수 있습니다.
 
 ## 1. 준비물
 
@@ -62,13 +63,13 @@ npm -v
 
 ## 4. 쉬운 설치 도우미 실행
 
-배포본 폴더에서 실행합니다.
+배포본 폴더에서 `쉬운설치.cmd`를 더블 클릭합니다.
+
+PowerShell에서 직접 실행해야 하는 경우에는 아래처럼 실행할 수 있습니다. 이 명령도 화면형 설치 도우미를 엽니다.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/easy-install.ps1
 ```
-
-또는 `쉬운설치.cmd`를 더블 클릭합니다.
 
 설치 도우미가 질문하는 값:
 

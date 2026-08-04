@@ -19,10 +19,12 @@ Windows에서는 배포본 폴더의 아래 파일을 더블 클릭합니다.
 ```
 
 설치 도우미가 Firebase/Cloudflare 설정값을 질문하고, 필요한 파일 생성과 배포 명령을 순서대로 진행합니다.
+검은 명령창에 질문이 계속 나오는 방식이 아니라, 단계별 입력 화면에서 필요한 값만 차례로 넣는 방식입니다.
 
 자세한 안내:
 
 - [docs/쉬운_설치_도우미.md](docs/쉬운_설치_도우미.md)
+- [docs/설치도우미_샘플화면.html](docs/설치도우미_샘플화면.html)
 - [INSTALL.md](INSTALL.md)
 
 ## 구성
@@ -32,7 +34,8 @@ Windows에서는 배포본 폴더의 아래 파일을 더블 클릭합니다.
 - `shared/`: 웹과 Worker가 함께 쓰는 공통 로직
 - `templates/`: 처음 설치할 때 가져올 CSV 예제 데이터
 - `scripts/setup-from-csv.mjs`: CSV 예제 데이터를 Firestore에 넣는 초기 설정 스크립트
-- `scripts/easy-install.ps1`: 쉬운 설치 도우미
+- `scripts/install-helper-gui.ps1`: 화면형 설치 도우미
+- `scripts/easy-install.ps1`: 기존 안내와의 호환을 위한 실행 파일
 - `docs/`: 설치와 운영 안내 문서
 
 ## 배포 자료 받기

@@ -27,6 +27,18 @@ export async function getGroup(g) {
   return s.exists() ? s.data() : null;
 }
 
+export async function getGroups() {
+  const snap = await getDocs(collection(db, 'groups'));
+  const list = [];
+  snap.forEach((d) => {
+    const v = d.data();
+    if (v.active !== false) list.push({ id: d.id, key: d.id, ...v });
+  });
+  list.sort((a, b) => (Number(a.sortOrder) || 999) - (Number(b.sortOrder) || 999)
+    || String(a.name || '').localeCompare(String(b.name || '')));
+  return list;
+}
+
 export async function getConfig() {
   const s = await getDoc(doc(db, 'config', 'app'));
   return s.exists() ? s.data() : {};

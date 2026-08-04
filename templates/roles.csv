@@ -1,5 +1,7 @@
-key,name,pin,kind,groupKeys,noticeKeys,canReadCongReports,canWriteCongMembers,canManagePublications,canReadContacts,canWriteContacts
-secretary,서기,2468,editor,*,cong|branch|week|groupnews|duty|visit|mid|talk|roster,true,true,true,true,true
-service,봉사 감독자,1357,editor,*,cong|groupnews|duty|visit|mid|talk,true,false,false,true,false
-group1-overseer,1집단 감독자,1111,editor,group1,groupnews,false,false,false,true,true
-group2-overseer,2집단 감독자,2222,editor,group2,groupnews,false,false,false,true,true
+key,name,pin,kind,groupKeys,noticeKeys,canReadCongReports,canWriteCongMembers,canManagePublications,canReadContacts,canWriteContacts,canManagePins,canManageTalks,canAssignTalkParts,canManageVisits
+coord,회중 조정자,1111,editor,*,cong|branch|week|groupnews|duty|visit|mid|talk|roster,true,true,true,true,true,true,false,true,true
+secretary,회중 서기,2222,editor,*,cong|branch|week|groupnews|duty|visit|mid|talk|roster,true,true,true,true,true,false,false,false,false
+service,봉사 감독자,3333,editor,*,cong|groupnews|duty|visit|mid|roster,true,false,false,true,false,false,false,false,true
+life,생활과 봉사 감독자,4444,editor,*,mid|duty,false,false,false,true,false,false,false,false,false
+talk,공개강연 조정자,5555,editor,*,talk,false,false,false,true,false,false,true,false,false
+elder,회중 장로,0000,editor,*,groupnews,false,false,false,true,false,false,false,false,false

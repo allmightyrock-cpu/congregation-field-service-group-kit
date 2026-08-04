@@ -67,6 +67,10 @@ function list(value) {
   return v.split('|').map((x) => x.trim()).filter(Boolean);
 }
 
+function claimBool(row, key) {
+  return bool(row[key]);
+}
+
 function memberId(groupKey, seq) {
   return `${groupKey}-${String(Number(seq) || 0).padStart(2, '0')}`;
 }
@@ -123,6 +127,7 @@ for (const g of groups) {
 }
 
 for (const m of members) {
+  if (!String(m.groupKey || '').trim() || !String(m.name || '').trim()) continue;
   const id = memberId(m.groupKey, m.seq);
   await put(`groups/${m.groupKey}/members/${id}`, {
     name: m.name,
@@ -160,11 +165,15 @@ for (const r of roles) {
     role: r.key,
     groupKeys: list(r.groupKeys),
     noticeKeys: list(r.noticeKeys),
-    canReadCongReports: bool(r.canReadCongReports),
-    canWriteCongMembers: bool(r.canWriteCongMembers),
-    canManagePublications: bool(r.canManagePublications),
-    canReadContacts: bool(r.canReadContacts),
-    canWriteContacts: bool(r.canWriteContacts)
+    canReadCongReports: claimBool(r, 'canReadCongReports'),
+    canWriteCongMembers: claimBool(r, 'canWriteCongMembers'),
+    canManagePublications: claimBool(r, 'canManagePublications'),
+    canReadContacts: claimBool(r, 'canReadContacts'),
+    canWriteContacts: claimBool(r, 'canWriteContacts'),
+    canManagePins: claimBool(r, 'canManagePins'),
+    canManageTalks: claimBool(r, 'canManageTalks'),
+    canAssignTalkParts: claimBool(r, 'canAssignTalkParts'),
+    canManageVisits: claimBool(r, 'canManageVisits')
   };
   await put(`roles/${r.key}`, {
     key: r.key,
@@ -181,6 +190,27 @@ for (const r of roles) {
     scope: 'role',
     key: r.key,
     active: true,
+    claims,
+    ...cred,
+    updatedAt: now,
+    updatedBy: 'setup-from-csv'
+  });
+}
+
+for (const g of groups) {
+  const claims = {
+    kind: 'editor',
+    role: 'group',
+    groupKeys: [g.key],
+    noticeKeys: ['groupnews'],
+    canReadContacts: true,
+    canWriteContacts: true
+  };
+  const cred = await makeCredential('0000');
+  await put(`pinCredentials/group-${g.key}`, {
+    scope: 'group',
+    key: g.key,
+    active: bool(g.active, true),
     claims,
     ...cred,
     updatedAt: now,

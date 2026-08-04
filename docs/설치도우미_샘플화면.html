@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>설치 도우미 샘플 화면</title>
+  <style>
+    body { margin: 0; font-family: "Malgun Gothic", Arial, sans-serif; background: #eef2f6; color: #17202a; }
+    .window { width: 980px; margin: 28px auto; background: #f8fafc; border: 1px solid #cfd8e3; box-shadow: 0 18px 50px rgba(15, 23, 42, .18); border-radius: 10px; overflow: hidden; }
+    .bar { height: 42px; background: #ffffff; border-bottom: 1px solid #d7dee8; display: flex; align-items: center; padding: 0 18px; font-weight: 700; }
+    .wrap { padding: 24px 28px 28px; }
+    h1 { font-size: 28px; margin: 0 0 8px; }
+    .lead { color: #5b6b7d; margin: 0 0 22px; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .tab { padding: 10px 16px; border-radius: 8px; background: #e8eef5; color: #506173; font-weight: 700; }
+    .tab.on { background: #0b7f46; color: #fff; }
+    .panel { background: #fff; border: 1px solid #dbe3ed; border-radius: 8px; padding: 24px; min-height: 360px; }
+    .hint { background: #f2f8f5; border-left: 4px solid #0b7f46; padding: 12px 14px; color: #3a4a58; margin-bottom: 20px; }
+    .row { display: grid; grid-template-columns: 190px 1fr; align-items: center; gap: 18px; margin: 14px 0; }
+    label { font-weight: 700; }
+    input, select { height: 38px; border: 1px solid #cbd5e1; border-radius: 7px; padding: 0 12px; font-size: 15px; }
+    .groups { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; margin-top: 8px; }
+    .groupbox { display: grid; grid-template-columns: 95px 1fr; align-items: center; gap: 10px; }
+    .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+    button { border: 0; border-radius: 7px; padding: 10px 18px; font-weight: 800; font-size: 15px; }
+    .secondary { background: #e8eef5; color: #263445; }
+    .primary { background: #0b7f46; color: #fff; }
+    .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
+    .card { border: 1px solid #dbe3ed; border-radius: 8px; padding: 14px; background: #fbfdff; }
+    .card b { display: block; margin-bottom: 6px; }
+    .muted { color: #66788a; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="window">
+    <div class="bar">Congregation Field Service Group Kit - 설치 도우미</div>
+    <div class="wrap">
+      <h1>회중 야외 봉사 집단 프로그램 설치 도우미</h1>
+      <p class="lead">처음에는 집단 이름만 정합니다. 성원 명단은 설치 후 감독자/보조자 또는 서기가 입력할 수 있습니다.</p>
+      <div class="tabs">
+        <div class="tab">1 기본 정보</div>
+        <div class="tab on">2 집단 이름</div>
+        <div class="tab">3 Firebase</div>
+        <div class="tab">4 Cloudflare</div>
+        <div class="tab">5 실행</div>
+      </div>
+      <div class="panel">
+        <div class="hint">회중마다 집단 수와 이름이 다르므로 여기서 정합니다. 최소 3개, 필요하면 10개 이상도 가능합니다.</div>
+        <div class="row">
+          <label>집단 개수</label>
+          <select><option>6개</option></select>
+        </div>
+        <div class="groups">
+          <div class="groupbox"><label>1 번째</label><input value="대방 집단"></div>
+          <div class="groupbox"><label>2 번째</label><input value="부영 집단"></div>
+          <div class="groupbox"><label>3 번째</label><input value="지행 집단"></div>
+          <div class="groupbox"><label>4 번째</label><input value="주공1 집단"></div>
+          <div class="groupbox"><label>5 번째</label><input value="주공3 집단"></div>
+          <div class="groupbox"><label>6 번째</label><input value="6집단"></div>
+        </div>
+        <div class="summary">
+          <div class="card"><b>성원 명단</b><span class="muted">처음에는 비워 둡니다.</span></div>
+          <div class="card"><b>역할 PIN</b><span class="muted">1111-5555 기본값 생성</span></div>
+          <div class="card"><b>집단 PIN</b><span class="muted">감독자/보조자 0000</span></div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="secondary">이전</button>
+        <button class="secondary">다음</button>
+        <button class="primary">준비 파일 만들기</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

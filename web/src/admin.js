@@ -28,10 +28,7 @@ const ROLE_LABELS = {
   coord: '회중 조정자', life: '생활과 봉사 감독자',
   talk: '공개강연 조정자', secretary: '회중 서기', service: '봉사 감독자', elder: '회중 장로'
 };
-const GROUP_LABELS = {
-  group1: '1집단', group2: '2집단', group3: '3집단', group4: '4집단',
-  group5: '5집단', group6: '6집단', group7: '7집단'
-};
+let GROUP_LABELS = Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`group${i + 1}`, `${i + 1}집단`]));
 let appEl = document.querySelector('#app');
 const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
   .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -57,7 +54,20 @@ export function startAdminApp(options = {}) {
   session = null;
   rendered = [];
   currentKey = null;
-  loginScreen();
+  shell('<h1>편집자 로그인</h1><p class="muted">집단 정보를 불러오는 중...</p>');
+  loadAdminGroups().finally(() => loginScreen());
+}
+
+async function loadAdminGroups() {
+  try {
+    const snap = await getDocs(query(collection(db, 'groups'), orderBy('sortOrder')));
+    const labels = {};
+    snap.forEach((d) => {
+      const v = d.data();
+      if (v.active !== false) labels[d.id] = v.name || d.id;
+    });
+    if (Object.keys(labels).length) GROUP_LABELS = labels;
+  } catch {}
 }
 
 // ---------- 로그인 ----------

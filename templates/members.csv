@@ -1,7 +1,1 @@
 groupKey,seq,name,displayName,gender,role,regularPioneer,active,note
-group1,1,홍길동,홍길동,형제,감독자,false,true,
-group1,2,김사랑,김사랑,자매,성원,false,true,
-group1,3,박믿음,박믿음,형제,성원,false,true,
-group2,1,이소망,이소망,형제,감독자,false,true,
-group2,2,최은혜,최은혜,자매,성원,false,true,
-group2,3,정평화,정평화,형제,성원,false,true,

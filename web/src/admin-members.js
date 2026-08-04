@@ -1,6 +1,6 @@
 export const MEMBER_GENDERS = ['', '형제', '자매'];
-export const MEMBER_ROLES = ['', '장로', '봉사의 종', '전도인'];
-export const GROUP_ORDER = ['daebang', 'buyeong', 'jihaeng', 'jugong1', 'jugong3', 'human1', 'human2'];
+export const MEMBER_ROLES = ['', '성원', '봉사자', '파이오니아', '장로', '봉사의 종'];
+export const GROUP_ORDER = Array.from({ length: 30 }, (_, i) => `group${i + 1}`);
 export const ROSTER_NOTICE_KEY = 'roster';
 
 export function nextMemberSeq(members = []) {

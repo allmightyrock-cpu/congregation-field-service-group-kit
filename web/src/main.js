@@ -1,6 +1,6 @@
 ﻿import './styles.css';
 import {
-  memberSignIn, getGroup, getConfig, getMembers, submitReport, getNotices, getNoticePages,
+  memberSignIn, getGroup, getGroups, getConfig, getMembers, submitReport, getNotices, getNoticePages,
   getCongNoticeItems, getCongNoticeItemPages, getTalks, getVisits, getBoard, getGroupPosts
 } from './data.js';
 import { resolveReportConfig } from '../../shared/report-period.js';
@@ -29,7 +29,7 @@ import {
   safeScriptFileName, scriptOutputForMode
 } from './jw-script.js';
 
-const GROUP_NAMES = {
+let GROUP_NAMES = {
   group1: '1집단', group2: '2집단', group3: '3집단', group4: '4집단',
   group5: '5집단', group6: '6집단', group7: '7집단'
 };
@@ -1224,11 +1224,19 @@ function devPicker() {
     <p class="lead">실제로는 카카오톡 집단 링크로 접속합니다.</p><nav class="picks">${links}</nav>`);
 }
 
+async function loadGroupNames() {
+  try {
+    const groups = await getGroups();
+    if (groups.length) GROUP_NAMES = Object.fromEntries(groups.map((g) => [g.key || g.id, g.name || g.key || g.id]));
+  } catch {}
+}
+
 // ---------- 부트 ----------
 async function boot() {
   const params = new URLSearchParams(location.search);
   const g = params.get('g');
   if (!g && params.get('admin') === '1') return openAdminLogin({ replace: true });
+  await loadGroupNames();
   if (!g) return devPicker();
   if (!GROUP_NAMES[g]) return shell(`<h1>잘못된 링크</h1><p class="lead">집단 키가 올바르지 않습니다: <code>${esc(g)}</code></p>`);
 

@@ -1,5 +1,4 @@
 key,name,overseerName,assistantName,active,sortOrder
-group1,1집단,집단 감독자,보조자,true,1
-group2,2집단,집단 감독자,보조자,true,2
-group3,3집단,집단 감독자,보조자,true,3
-group4,4집단,집단 감독자,보조자,true,4
+group1,1집단,,,true,1
+group2,2집단,,,true,2
+group3,3집단,,,true,3

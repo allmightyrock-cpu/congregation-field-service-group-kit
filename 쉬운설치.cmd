@@ -1,5 +1,5 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\easy-install.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\install-helper-gui.ps1"
 pause
