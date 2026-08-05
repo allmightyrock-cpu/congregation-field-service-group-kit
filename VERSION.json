@@ -1,0 +1,13 @@
+{
+  "name": "Congregation Field Service Group Kit",
+  "version": "2026.08.05-current-design",
+  "date": "2026-08-05",
+  "channel": "distribution",
+  "notes": [
+    "Current visual design applied",
+    "Role-based editor menu included",
+    "Group supervisor menu included",
+    "Publication and emergency contact tools included",
+    "Update helper added"
+  ]
+}

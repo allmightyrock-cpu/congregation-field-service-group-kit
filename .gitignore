@@ -1,0 +1,11 @@
+node_modules/
+dist/
+web/tests/
+.wrangler/
+.env
+.env.*
+*.local
+*.log
+service-account*.json
+firebase-service-account*.json
+*.zip

@@ -1,0 +1,382 @@
+﻿rules_version = '2';
+
+// ============================================================
+// 야외 봉사 집단 도구 — Firestore 보안 규칙
+// 배포본 사용 회중의 Firebase 프로젝트에 적용하십시오.
+//
+// 신원 모델 (Custom Token claims):
+//   성원  : { kind:'member', groupKey:'group1' }
+//   편집자: { kind:'editor', role:..., groupKeys:[], noticeKeys:[],
+//            canWriteBoard:[], canReadReports:[], canWriteReports:[],
+//            canReadShepherding:[], canWriteShepherding:[],
+//            canManageTalks:bool, canManageVisits:bool,
+//            canReadCongReports:bool, canWriteConfig:bool,
+//            canWriteCongMembers:bool, canWriteMembers:[] }  // 성원 명단 편집(서기/감독자)
+//
+// 원칙:
+//   - 성원/편집자 모두 자기 집단으로만 범위 제한
+//   - 양치는 일 기록(shepherdingRecords)은 해당 집단 감독자·보조자만 (예외 없음)
+//   - pinCredentials 는 클라이언트 전면 차단(Worker만 Admin 접근)
+//   - 구조 컬렉션(groups/members/roles)은 서버(마이그레이션/Worker) 전용 쓰기
+// ============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- 공통 헬퍼 ----------
+    function tok()        { return request.auth.token; }
+    function signedIn()   { return request.auth != null; }
+    function kindOf()     { return signedIn() ? tok().get('kind', '') : ''; }
+    function isMember()   { return kindOf() == 'member'; }
+    function isEditor()   { return kindOf() == 'editor'; }
+    function myGroup()    { return tok().get('groupKey', ''); }        // 성원 집단
+    function cList(name)  { return tok().get(name, []); }              // 편집자 리스트 claim
+    function cBool(name)  { return tok().get(name, false); }           // 편집자 불리언 claim
+    function inC(name, v) { return v in cList(name); }
+    function uid()        { return request.auth.uid; }
+
+    function cfg() {
+      return get(/databases/$(database)/documents/config/app).data;
+    }
+    function memberActive(g, m) {
+      return exists(/databases/$(database)/documents/groups/$(g)/members/$(m))
+        && get(/databases/$(database)/documents/groups/$(g)/members/$(m)).data.active == true;
+    }
+
+    // ---------- 검증 함수 ----------
+    function validReport(g, m, period) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['period','groupKey','memberId','memberName',
+                               'participated','bibleStudies','auxiliaryPioneer','pioneerType','hours',
+                               'memo','submittedBy','submittedAt','updatedAt'])
+        && d.keys().hasAll(['period','groupKey','memberId','participated','submittedBy','submittedAt'])
+        && d.period == period
+        && d.groupKey == g
+        && d.memberId == m
+        && d.participated is bool
+        && (!('bibleStudies' in d) || (d.bibleStudies is int && d.bibleStudies >= 0 && d.bibleStudies <= 50))
+        && (!('auxiliaryPioneer' in d) || d.auxiliaryPioneer is bool)
+        && (!('pioneerType' in d) || (d.pioneerType is string && d.pioneerType.size() <= 12))
+        && (!('hours' in d) || (d.hours is number && d.hours >= 0 && d.hours <= 400))
+        && (!('memberName' in d) || (d.memberName is string && d.memberName.size() <= 40))
+        && (!('memo' in d) || (d.memo is string && d.memo.size() <= 300))
+        && d.submittedBy == uid()               // 감사: 작성자 uid
+        && d.submittedAt == request.time;        // 감사: 서버 시각 강제
+    }
+
+    // 서기 성원 편집: 공개 안전필드만 허용(임의 필드/구조 차단), 감사필드 강제
+    function validMember() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['name','displayName','seq','gender','role',
+                               'regularPioneer','elder','active','updatedBy','updatedAt'])
+        && d.keys().hasAll(['name','seq','active'])
+        && d.name is string && d.name.size() >= 1 && d.name.size() <= 40
+        && (!('displayName' in d) || (d.displayName is string && d.displayName.size() <= 40))
+        && d.seq is int && d.seq >= 0 && d.seq <= 999
+        && (!('gender' in d) || (d.gender is string && d.gender.size() <= 10))
+        && (!('role' in d) || (d.role is string && d.role.size() <= 20))
+        && (!('regularPioneer' in d) || d.regularPioneer is bool)
+        && (!('elder' in d) || d.elder is bool)
+        && d.active is bool
+        && d.updatedBy == uid()
+        && d.updatedAt is timestamp;
+    }
+
+    // 서기 성원 편집: 민감 메모(membersPrivate)
+    function validNote() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['note','updatedBy','updatedAt'])
+        && d.note is string && d.note.size() <= 2000
+        && d.updatedBy == uid()
+        && d.updatedAt is timestamp;
+    }
+
+    // 비상연락처/주소록 (groups/{g}/emergencyContacts/{c}) — 서기 편집, 장로/감독자 열람. 하드삭제 금지(active:false).
+    function validEmergencyContact() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['name','phone','address','emergencyName','emergencyPhone',
+                               'relation','memo','active','updatedBy','updatedAt','createdAt'])
+        && d.name is string && d.name.size() <= 60
+        && d.active is bool
+        && (!('phone' in d) || (d.phone is string && d.phone.size() <= 40))
+        && (!('address' in d) || (d.address is string && d.address.size() <= 200))
+        && (!('emergencyName' in d) || (d.emergencyName is string && d.emergencyName.size() <= 60))
+        && (!('emergencyPhone' in d) || (d.emergencyPhone is string && d.emergencyPhone.size() <= 40))
+        && (!('relation' in d) || (d.relation is string && d.relation.size() <= 40))
+        && (!('memo' in d) || (d.memo is string && d.memo.size() <= 500))
+        && (!('createdAt' in d) || d.createdAt is timestamp)
+        && (!('updatedAt' in d) || d.updatedAt is timestamp)
+        && d.updatedBy == uid();
+    }
+
+    // 출판물 신청 부수 — 고정(standing) 모델 (groups/{g}/publicationDistributions/standing) — 봉사/집단 감독자.
+    //   counts.{품목}.{memberId} = 부수. 성원ID가 동적 키인 중첩 맵 → 구조/타입/크기까지만 검증.
+    function validPublicationDist() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['counts','updatedBy','updatedAt','createdAt'])
+        && (!('counts' in d) || d.counts is map)
+        && (!('createdAt' in d) || d.createdAt is timestamp)
+        && d.updatedAt is timestamp
+        && d.updatedBy == uid();
+    }
+
+    function validNotice(k) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['key','category','title','subtitle','body',
+                               'bodyHtml','bodyJson','plainText','order',
+                               'visible','urgent','attachmentUrl','pageCount','pdfUrl','updatedAt','updatedBy'])
+        && d.key == k
+        && d.title is string && d.title.size() <= 120
+        && d.visible is bool
+        && (!('urgent' in d) || d.urgent is bool)
+        && (!('body' in d) || (d.body is string && d.body.size() <= 20000))
+        // 리치 편집기(Tiptap) 저장 필드. HTML 안전성은 성원 화면 DOMPurify 정제 담당(규칙은 타입/크기만).
+        && (!('bodyHtml' in d) || (d.bodyHtml is string && d.bodyHtml.size() <= 80000))
+        && (!('plainText' in d) || (d.plainText is string && d.plainText.size() <= 20000))
+        // bodyJson: 문자열(권장, 크기가드 가능·중첩제한 회피) 또는 map 허용
+        && (!('bodyJson' in d) || ((d.bodyJson is string && d.bodyJson.size() <= 120000) || d.bodyJson is map))
+        && (!('pageCount' in d) || (d.pageCount is int && d.pageCount >= 0 && d.pageCount <= 50))
+        // 새 소식 강조: 편집자 저장 시 serverTimestamp 기록(타입만 검증, serverTimestamp 허용)
+        && (!('updatedAt' in d) || d.updatedAt is timestamp)
+        && d.updatedBy == uid();
+    }
+
+    // 광고 PDF·사진 → 이미지 페이지 (notices/{k}/pages/{p}): dataUrl(압축 JPEG) 저장
+    function validNoticePage() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['index','dataUrl','updatedBy'])
+        && d.index is int
+        && d.updatedBy == uid()
+        // 편집기 압축 목표 ~700KB. 여유 두고 750,000자로 조임(1MB 문서한도 보호).
+        && d.dataUrl is string && d.dataUrl.size() < 750000;
+    }
+
+    // 게시판형 광고 항목 (notices/{k}/items/{itemId}) — 주로 회중 광고(cong). 하드삭제 금지(soft delete).
+    function validNoticeItem(k) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['parentKey','title','subtitle','bodyHtml','bodyJson','plainText',
+                               'visible','urgent','pinned','deletedAt','updatedBy','updatedAt','createdAt'])
+        && d.parentKey == k
+        && d.title is string && d.title.size() <= 120
+        && d.visible is bool
+        && (!('subtitle' in d) || (d.subtitle is string && d.subtitle.size() <= 200))
+        && (!('bodyHtml' in d) || (d.bodyHtml is string && d.bodyHtml.size() <= 80000))
+        && (!('plainText' in d) || (d.plainText is string && d.plainText.size() <= 20000))
+        && (!('bodyJson' in d) || ((d.bodyJson is string && d.bodyJson.size() <= 120000) || d.bodyJson is map))
+        && (!('urgent' in d) || d.urgent is bool)
+        && (!('pinned' in d) || d.pinned is bool)
+        && (!('deletedAt' in d) || d.deletedAt is timestamp)
+        && (!('createdAt' in d) || d.createdAt is timestamp)
+        && (!('updatedAt' in d) || d.updatedAt is timestamp)
+        && d.updatedBy == uid();
+    }
+
+    function validBoard(g) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['groupKey','news','updatedAt','updatedBy'])
+        && d.groupKey == g
+        && (!('news' in d) || (d.news is string && d.news.size() <= 20000))
+        && d.updatedBy == uid();
+    }
+    function validBoardPost() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['title','body','sort','updatedAt','updatedBy','createdAt'])
+        && d.updatedBy == uid()
+        && d.title is string && d.title.size() > 0 && d.title.size() <= 200
+        && d.body is string && d.body.size() <= 20000
+        && d.sort is number;
+    }
+
+    function validTalk() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['id','date','speakerName','speakerCong','title','talkNo','talkType',
+                               'chairman','watchtowerReader','closingPrayer',
+                               'order','updatedAt','updatedBy'])
+        && d.updatedBy == uid();
+    }
+    // 회중 조정자 임명 수정: 사회·낭독·기도(+updatedBy/At)만 변경, 계획 필드는 불변
+    function validTalkAssign() {
+      let d = request.resource.data;
+      let o = resource.data;
+      return d.updatedBy == uid()
+        && d.diff(o).affectedKeys().hasOnly(['chairman','watchtowerReader','closingPrayer','updatedAt','updatedBy'])
+        && d.date == o.date
+        && d.speakerName == o.speakerName
+        && d.speakerCong == o.speakerCong
+        && d.title == o.title;
+    }
+
+    function validVisit() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['id','groupKey','date','withService','memo','updatedAt','updatedBy'])
+        && d.groupKey is string
+        && d.updatedBy == uid();
+    }
+
+    function validConfig() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['reportPeriod','reportPeriodOverride','reportOpen','congName','updatedAt','updatedBy'])
+        && d.reportPeriod is string
+        && (!('reportPeriodOverride' in d) || d.reportPeriodOverride is string)
+        && d.reportOpen is bool
+        && d.updatedBy == uid();
+    }
+
+    // ---------- groups (집단) ----------
+    match /groups/{g} {
+      allow read:  if signedIn();
+      allow write: if false;                     // 서버/마이그레이션 전용
+
+      // 명단(공개 안전 필드만: 이름·표시명·순번·활성)
+      match /members/{m} {
+        allow read: if (isMember() && myGroup() == g)
+                     || (isEditor() && (inC('groupKeys', g) || cBool('canReadCongReports') || cBool('canManagePublications')));
+        // 서기 편집: 추가·수정만. 하드삭제 금지(비활성 active:false로만) → delete는 서버/시드 전용.
+        // 집단 간 이동(#5 방법2)=B에 create + A에서 active:false update, 둘 다 canWriteCongMembers로 커버.
+        allow create, update: if isEditor()
+          && (cBool('canWriteCongMembers') || inC('canWriteMembers', g))
+          && validMember();
+      }
+
+      // 명단 민감 필드(성원 접근 불가): 자기 집단 감독자 또는 서기(cong-wide)
+      match /membersPrivate/{m} {
+        allow read:  if isEditor() && (inC('groupKeys', g) || cBool('canWriteCongMembers'));
+        allow create, update: if isEditor()
+          && (cBool('canWriteCongMembers') || inC('canWriteMembers', g))
+          && validNote();
+      }
+
+      // 비상연락처/주소록 — 서기(canWriteContacts) 편집, 장로(canReadContacts) 전체 열람,
+      //   집단감독자·보조자(groupKeys[g]) 자기 집단만 열람. 일반 성원 접근 불가. 하드삭제 금지(active:false).
+      match /emergencyContacts/{c} {
+        allow read: if isEditor()
+                     && (cBool('canReadContacts') || cBool('canWriteContacts') || inC('groupKeys', g));
+        allow create, update: if isEditor() && cBool('canWriteContacts') && validEmergencyContact();
+      }
+
+      // 출판물 신청 부수(고정) — 봉사 감독자(canManagePublications) 전 집단, 집단 감독자·보조자(groupKeys[g]) 자기 집단.
+      //   성원·서기 접근 불가. 문서 id='standing' 고정, 갱신만.
+      match /publicationDistributions/{docId} {
+        allow read: if isEditor()
+                     && (cBool('canManagePublications') || inC('groupKeys', g));
+        allow create, update: if isEditor()
+          && (cBool('canManagePublications') || inC('groupKeys', g))
+          && validPublicationDist();
+      }
+
+      // 양치는 일 기록 — 해당 집단 감독자·보조자만 (예외 없음)
+      match /shepherdingRecords/{r} {
+        allow read:  if isEditor() && inC('canReadShepherding', g);
+        allow write: if isEditor() && inC('canWriteShepherding', g);
+      }
+    }
+
+    // ---------- reports (봉사 보고) ----------
+    match /reports/{period}/groups/{g}/members/{m} {
+      // 읽기: 자기 집단 감독자 / 전집단 서기
+      allow read: if isEditor() && (inC('canReadReports', g) || inC('groupKeys', g) || cBool('canReadCongReports'));
+
+      // 성원 본인 제출/정정: 자기 집단 + 열린 기간 + 활성 성원 + 필드 검증
+      allow create, update: if isMember()
+        && myGroup() == g
+        && period == cfg().reportPeriod
+        && cfg().reportOpen == true
+        && memberActive(g, m)
+        && validReport(g, m, period);
+
+      // 감독자 대리제출/정정: 자기 집단 + 활성 성원 + 필드 검증(기간 제한 없음)
+      allow create, update: if isEditor()
+        && inC('canWriteReports', g)
+        && memberActive(g, m)
+        && validReport(g, m, period);
+
+      allow delete: if false;
+    }
+
+    // ---------- notices (광고·안내) ----------
+    match /notices/{k} {
+      allow read:  if isEditor()
+                    || (isMember() && resource.data.visible == true);
+      allow write: if isEditor() && inC('noticeKeys', k) && validNotice(k);
+
+      // PDF → 이미지 페이지 (성원 읽기, 담당 편집자만 쓰기)
+      match /pages/{p} {
+        allow read:           if signedIn();
+        allow create, update: if isEditor() && inC('noticeKeys', k) && validNoticePage();
+        allow delete:         if isEditor() && inC('noticeKeys', k);
+      }
+
+      // 게시판형 항목 (주로 회중 광고 cong): 담당(noticeKeys[k]) 편집자만 생성/수정.
+      // 성원은 visible==true 만 열람. 하드삭제 금지 → visible:false/deletedAt 소프트삭제(update).
+      match /items/{itemId} {
+        allow read:           if isEditor() || (isMember() && resource.data.visible == true);
+        allow create, update: if isEditor() && inC('noticeKeys', k) && validNoticeItem(k);
+
+        // 항목 이미지 페이지: 성원은 상위 item이 visible일 때만 읽기
+        match /pages/{p} {
+          allow read: if isEditor()
+                       || (isMember()
+                           && get(/databases/$(database)/documents/notices/$(k)/items/$(itemId)).data.visible == true);
+          allow create, update: if isEditor() && inC('noticeKeys', k) && validNoticePage();
+          allow delete:         if isEditor() && inC('noticeKeys', k);
+        }
+      }
+    }
+
+    // ---------- boards (우리 집단 소식) ----------
+    match /boards/{g} {
+      allow read:  if (isMember() && myGroup() == g)
+                    || (isEditor() && inC('groupKeys', g));
+      allow write: if isEditor() && inC('canWriteBoard', g) && validBoard(g);
+
+      // 다건 게시물(주차별 예습 자료 등) — 성원은 자기 집단 열람, 편집자는 담당 집단 관리
+      match /posts/{postId} {
+        allow read:           if (isMember() && myGroup() == g)
+                               || (isEditor() && inC('groupKeys', g));
+        allow create, update: if isEditor() && inC('canWriteBoard', g) && validBoardPost();
+        allow delete:         if isEditor() && inC('canWriteBoard', g);
+      }
+    }
+
+    // ---------- talks (주말 공개강연) ----------
+    match /talks/{id} {
+      allow read:  if signedIn();
+      // 공개강연 조정자: 강연 계획 전체(생성·수정·삭제)
+      allow write:  if isEditor() && cBool('canManageTalks') && validTalk();
+      // 회중 조정자: 이미 계획된 강연의 임명(사회·낭독·기도)만 수정
+      allow update: if isEditor() && cBool('canAssignTalkParts') && validTalkAssign();
+    }
+
+    // ---------- visits (봉사 감독자 방문) ----------
+    match /visits/{id} {
+      // 성원·감독자는 자기 집단 방문만 / 서기·봉사감독자는 전체
+      allow read: if (isMember() && resource.data.groupKey == myGroup())
+                   || (isEditor() && (inC('groupKeys', resource.data.groupKey)
+                                      || cBool('canReadCongReports')
+                                      || cBool('canManageVisits')));
+      allow write: if isEditor() && cBool('canManageVisits') && validVisit();
+    }
+
+    // ---------- roles (역할/직책 — 인증 설정) ----------
+    match /roles/{rk} {
+      allow read:  if signedIn();                // 라벨/담당자명(공개)
+      allow write: if false;                     // 서버 전용
+    }
+
+    // ---------- config (앱 설정) ----------
+    match /config/{doc} {
+      allow read:  if signedIn();
+      allow write: if isEditor() && cBool('canWriteConfig') && doc == 'app' && validConfig();
+    }
+
+    // ---------- pinCredentials (Worker 전용) ----------
+    match /pinCredentials/{doc=**} {
+      allow read, write: if false;
+    }
+
+    // ---------- 그 외 전부 거부 (명시적) ----------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

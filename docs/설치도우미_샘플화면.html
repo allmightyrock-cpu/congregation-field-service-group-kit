@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>설치 도우미 샘플 화면</title>
+  <style>
+    body { margin:0; font-family:"Malgun Gothic", Arial, sans-serif; background:#eef1f5; color:#222; }
+    .window { width:980px; max-width:calc(100% - 32px); margin:28px auto; background:#fff; border:1px solid #cfd5df; box-shadow:0 12px 32px rgba(0,0,0,.16); }
+    header { display:flex; align-items:center; gap:18px; padding:22px 26px; border-bottom:1px solid #d9dde5; }
+    .mark { width:68px; height:68px; background:#4f75b5; color:#fff; display:grid; place-items:center; font-weight:800; line-height:.95; text-align:center; font-size:22px; }
+    h1 { margin:0; font-size:25px; }
+    p { margin:6px 0 0; color:#606a78; }
+    .tabs { display:grid; grid-template-columns:repeat(5, 1fr); border-bottom:1px solid #d9dde5; }
+    .tab { padding:14px 18px; border-right:1px solid #d9dde5; font-weight:700; background:#f7f8fa; }
+    .tab.active { background:#4f75b5; color:#fff; }
+    main { padding:26px; }
+    .hint { padding:14px 16px; border-left:5px solid #4f75b5; background:#f7f9fc; color:#425067; margin-bottom:20px; line-height:1.55; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    label { display:block; font-weight:700; margin-bottom:7px; }
+    input, select { width:100%; padding:11px; border:1px solid #cbd3df; font:inherit; }
+    .groups { display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-top:16px; }
+    .box { border:1px solid #d9dde5; padding:14px; background:#fff; }
+    .summary { display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; margin-top:22px; }
+    .card { border:1px solid #d9dde5; border-left:5px solid #6b7685; padding:14px; box-shadow:0 4px 12px rgba(0,0,0,.08); }
+    .card b { display:block; margin-bottom:6px; }
+    .actions { display:flex; justify-content:flex-end; gap:10px; padding:20px 26px; border-top:1px solid #d9dde5; background:#f7f8fa; }
+    button { border:1px solid #cbd3df; background:#fff; padding:10px 18px; font-weight:700; }
+    .primary { background:#4f75b5; border-color:#4f75b5; color:#fff; }
+  </style>
+</head>
+<body>
+  <section class="window">
+    <header>
+      <div class="mark">FSG<br>SETUP</div>
+      <div>
+        <h1>야외 봉사 집단 프로그램 설치 도우미</h1>
+        <p>처음 설치하는 회중도 필요한 값만 차례대로 입력할 수 있도록 구성한 화면 예시입니다.</p>
+      </div>
+    </header>
+    <div class="tabs">
+      <div class="tab">1 회중</div>
+      <div class="tab active">2 집단</div>
+      <div class="tab">3 Firebase</div>
+      <div class="tab">4 Cloudflare</div>
+      <div class="tab">5 설치</div>
+    </div>
+    <main>
+      <div class="hint">
+        처음 설치할 때는 집단 이름만 정합니다. 성원 이름은 나중에 집단감독자·보조자가 직접 입력하거나 서기가 엑셀/CSV로 한꺼번에 등록할 수 있습니다.
+      </div>
+      <div class="grid">
+        <div>
+          <label>회중 이름</label>
+          <input value="예시 회중">
+        </div>
+        <div>
+          <label>야외 봉사 집단 개수</label>
+          <select><option>6개</option><option>7개</option><option>8개</option><option>10개 이상</option></select>
+        </div>
+      </div>
+      <div class="groups">
+        <div class="box"><label>1번째 집단</label><input value="1집단"></div>
+        <div class="box"><label>2번째 집단</label><input value="2집단"></div>
+        <div class="box"><label>3번째 집단</label><input value="3집단"></div>
+        <div class="box"><label>4번째 집단</label><input value="4집단"></div>
+        <div class="box"><label>5번째 집단</label><input value="5집단"></div>
+        <div class="box"><label>6번째 집단</label><input value="6집단"></div>
+      </div>
+      <div class="summary">
+        <div class="card"><b>성원 명단</b><span>처음에는 비워 둡니다.</span></div>
+        <div class="card"><b>역할 PIN</b><span>1111부터 5555까지 기본값 생성</span></div>
+        <div class="card"><b>집단 PIN</b><span>집단감독자·보조자 기본값 0000</span></div>
+      </div>
+    </main>
+    <div class="actions">
+      <button>이전</button>
+      <button class="primary">다음</button>
+    </div>
+  </section>
+</body>
+</html>

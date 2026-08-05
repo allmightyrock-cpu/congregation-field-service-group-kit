@@ -1,0 +1,4 @@
+key,name,overseerName,assistantName,active,sortOrder
+group1,1집단,,,true,1
+group2,2집단,,,true,2
+group3,3집단,,,true,3
