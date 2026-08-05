@@ -101,6 +101,44 @@ function Add-Help($parent, $text, $x, $y, $w = 760) {
   return $help
 }
 
+function Get-CommandOutput($fileName, $arguments) {
+  try {
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $fileName
+    $psi.Arguments = $arguments
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.CreateNoWindow = $true
+    $p = New-Object System.Diagnostics.Process
+    $p.StartInfo = $psi
+    [void]$p.Start()
+    $out = $p.StandardOutput.ReadToEnd().Trim()
+    $p.WaitForExit()
+    if ($p.ExitCode -eq 0 -and -not [string]::IsNullOrWhiteSpace($out)) { return $out }
+  } catch {}
+  return $null
+}
+
+function Get-NodeStatusText {
+  $node = Get-Command "node.exe" -ErrorAction SilentlyContinue
+  $npm = Get-Command "npm.cmd" -ErrorAction SilentlyContinue
+  if ($node -and $npm) {
+    $nodeVersion = Get-CommandOutput "node.exe" "--version"
+    $npmVersion = Get-CommandOutput "npm.cmd" "--version"
+    return (Txt "node_status_ok") + "  Node " + $nodeVersion + " / npm " + $npmVersion
+  }
+  return (Txt "node_status_missing")
+}
+
+function Assert-NodeAvailable {
+  $node = Get-Command "node.exe" -ErrorAction SilentlyContinue
+  $npm = Get-Command "npm.cmd" -ErrorAction SilentlyContinue
+  if (-not $node -or -not $npm) {
+    throw ((Txt "node_status_missing") + "`r`n" + (Txt "node_download_label"))
+  }
+}
+
 $form = New-Object System.Windows.Forms.Form
 $form.Text = Txt "window_title"
 $form.Size = New-Object System.Drawing.Size(940, 720)
@@ -126,6 +164,47 @@ $tabs = New-Object System.Windows.Forms.TabControl
 $tabs.Location = New-Object System.Drawing.Point(28, 102)
 $tabs.Size = New-Object System.Drawing.Size(872, 500)
 $form.Controls.Add($tabs)
+
+$tabPrereq = Add-Tab $tabs (Txt "tab_prereq")
+Add-Help $tabPrereq (Txt "prereq_help") 24 22
+Add-Label $tabPrereq (Txt "node_required_title") 30 88 360
+$lblNodeBody = New-Object System.Windows.Forms.Label
+$lblNodeBody.Text = Txt "node_required_body"
+$lblNodeBody.ForeColor = [System.Drawing.Color]::FromArgb(82, 96, 110)
+$lblNodeBody.Location = New-Object System.Drawing.Point(30, 120)
+$lblNodeBody.Size = New-Object System.Drawing.Size(760, 28)
+$tabPrereq.Controls.Add($lblNodeBody)
+$lblNodeStatus = New-Object System.Windows.Forms.Label
+$lblNodeStatus.Text = Get-NodeStatusText
+$lblNodeStatus.Font = New-Object System.Drawing.Font("Malgun Gothic", 10, [System.Drawing.FontStyle]::Bold)
+$lblNodeStatus.ForeColor = [System.Drawing.Color]::FromArgb(67, 102, 164)
+$lblNodeStatus.Location = New-Object System.Drawing.Point(30, 162)
+$lblNodeStatus.Size = New-Object System.Drawing.Size(760, 28)
+$tabPrereq.Controls.Add($lblNodeStatus)
+$lblNodeDownload = New-Object System.Windows.Forms.Label
+$lblNodeDownload.Text = Txt "node_download_label"
+$lblNodeDownload.Location = New-Object System.Drawing.Point(30, 206)
+$lblNodeDownload.Size = New-Object System.Drawing.Size(760, 28)
+$tabPrereq.Controls.Add($lblNodeDownload)
+$txtNodeSteps = New-Object System.Windows.Forms.TextBox
+$txtNodeSteps.Multiline = $true
+$txtNodeSteps.ReadOnly = $true
+$txtNodeSteps.Location = New-Object System.Drawing.Point(30, 244)
+$txtNodeSteps.Size = New-Object System.Drawing.Size(560, 128)
+$txtNodeSteps.Text = Txt "node_install_steps"
+$tabPrereq.Controls.Add($txtNodeSteps)
+$btnNodeCheck = New-Object System.Windows.Forms.Button
+$btnNodeCheck.Text = Txt "node_status_check"
+$btnNodeCheck.Location = New-Object System.Drawing.Point(610, 244)
+$btnNodeCheck.Size = New-Object System.Drawing.Size(190, 34)
+$tabPrereq.Controls.Add($btnNodeCheck)
+$btnNodeOpen = New-Object System.Windows.Forms.Button
+$btnNodeOpen.Text = Txt "node_open_download"
+$btnNodeOpen.Location = New-Object System.Drawing.Point(610, 288)
+$btnNodeOpen.Size = New-Object System.Drawing.Size(190, 34)
+$tabPrereq.Controls.Add($btnNodeOpen)
+$btnNodeCheck.Add_Click({ $lblNodeStatus.Text = Get-NodeStatusText })
+$btnNodeOpen.Add_Click({ Start-Process "https://nodejs.org/" })
 
 $tabBasic = Add-Tab $tabs (Txt "tab_basic")
 Add-Help $tabBasic (Txt "basic_help") 24 22
@@ -267,6 +346,9 @@ function Validate-Inputs {
 $btnPrepare.Add_Click({
   try {
     Validate-Inputs
+    if ($chkDeps.Checked -or $chkData.Checked -or $chkDeploy.Checked) {
+      Assert-NodeAvailable
+    }
     $btnPrepare.Enabled = $false
     $log.AppendText("준비 파일을 만들고 있습니다...`r`n")
     $groupNames = New-Object System.Collections.Generic.List[string]
