@@ -1470,6 +1470,31 @@ h2.sec { font-size: 16px; color: #66788a; margin: 26px 0 10px; }
   gap: 14px;
   align-items: start;
 }
+.report-group-block {
+  border: 1px solid #d5dce5;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(0,0,0,.05);
+}
+.report-group-block.miss {
+  border-color: #ead3cf;
+}
+.report-group-block .report-group-head {
+  border: 0;
+  border-bottom: 1px solid #e6ebf1;
+  box-shadow: none;
+}
+.report-row-nested {
+  margin: 0 14px;
+  border-width: 0 0 1px;
+  border-radius: 0;
+  box-shadow: none;
+}
+.report-row-nested:last-of-type {
+  border-bottom: 0;
+}
+.report-empty {
+  margin: 12px 15px;
+}
 .report-member {
   display: grid;
   gap: 5px;

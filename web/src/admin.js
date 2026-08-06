@@ -1779,29 +1779,151 @@ async function secretaryScreen() {
     const groups = Object.keys(GROUP_LABELS);
     let totalM = 0, totalS = 0;
     const blocks = [];
+    const exportRows = [];
+    const groupSummaryRows = [];
     for (const g of groups) {
       const ms = await getDocs(collection(db, 'groups', g, 'members'));
-      let active = 0; const names = {};
-      ms.forEach((d) => { const v = d.data(); if (v.active !== false) { active++; names[d.id] = v.name; } });
+      const members = [];
+      ms.forEach((d) => {
+        const v = d.data();
+        if (v.active !== false) members.push({ id: d.id, ...v });
+      });
+      members.sort((a, b) => (a.seq || 0) - (b.seq || 0));
+
       const submitted = new Set();
-      if (period) { const rs = await getDocs(collection(db, 'reports', period, 'groups', g, 'members')); rs.forEach((d) => submitted.add(d.id)); }
-      const miss = Object.keys(names).filter((id) => !submitted.has(id)).map((id) => names[id]);
-      totalM += active; totalS += submitted.size;
-      blocks.push(`<div class="rrow ${miss.length ? 'miss' : ''}"><span><b>${esc(GROUP_LABELS[g])}</b> 제출 ${submitted.size}/${active}
-        ${miss.length ? `<br><span class="muted">미제출: ${esc(miss.join(', '))}</span>` : ''}</span>
-        <span class="${miss.length ? 'missb' : 'okb'}">${miss.length ? miss.length + '명' : '완료'}</span></div>`);
+      const reports = {};
+      if (period) {
+        const rs = await getDocs(collection(db, 'reports', period, 'groups', g, 'members'));
+        rs.forEach((d) => {
+          submitted.add(d.id);
+          reports[d.id] = { id: d.id, ...d.data() };
+        });
+      }
+
+      const submittedMembers = members.filter((m) => submitted.has(m.id));
+      const miss = members.filter((m) => !submitted.has(m.id));
+      totalM += members.length; totalS += submittedMembers.length;
+      const regularCount = submittedMembers.filter((m) => (reports[m.id]?.pioneerType || '') === 'regular').length;
+      const auxiliaryCount = submittedMembers.filter((m) => (reports[m.id]?.pioneerType || (reports[m.id]?.auxiliaryPioneer ? 'auxiliary' : '')) === 'auxiliary').length;
+      const bibleStudiesTotal = submittedMembers.reduce((sum, m) => sum + (Number(reports[m.id]?.bibleStudies) || 0), 0);
+      const hoursTotal = submittedMembers.reduce((sum, m) => sum + (Number(reports[m.id]?.hours) || 0), 0);
+      groupSummaryRows.push({
+        보고월: plabel,
+        집단: GROUP_LABELS[g] || g,
+        성원수: members.length,
+        제출: submittedMembers.length,
+        미제출: miss.length,
+        제출률: members.length ? `${Math.round((submittedMembers.length / members.length) * 100)}%` : '0%',
+        성서연구합계: bibleStudiesTotal,
+        파이오니아시간합계: hoursTotal,
+        정규파이오니아: regularCount,
+        보조파이오니아: auxiliaryCount
+      });
+      members.forEach((m) => {
+        const report = reports[m.id] || {};
+        const hasReport = submitted.has(m.id);
+        exportRows.push(buildSecretaryReportCsvRow({
+          periodLabel: plabel,
+          groupLabel: GROUP_LABELS[g] || g,
+          member: m,
+          report,
+          submitted: hasReport
+        }));
+      });
+      const reportRows = submittedMembers.map((m) => `<div class="rrow report-row report-row-nested">
+        <span class="report-member">
+          <b>${esc(m.name)}</b>
+          ${reportDetailHtml(reports[m.id])}
+        </span>
+        <span class="okb">제출 완료</span>
+      </div>`).join('');
+
+      blocks.push(`<section class="report-group-block ${miss.length ? 'miss' : ''}">
+        <div class="rrow report-group-head"><span><b>${esc(GROUP_LABELS[g])}</b> 제출 ${submittedMembers.length}/${members.length}
+          ${miss.length ? `<br><span class="muted">미제출: ${esc(miss.map((m) => m.name).join(', '))}</span>` : ''}</span>
+          <span class="${miss.length ? 'missb' : 'okb'}">${miss.length ? miss.length + '명' : '완료'}</span></div>
+        ${reportRows || '<p class="muted report-empty">제출된 보고가 없습니다.</p>'}
+      </section>`);
     }
     shell(`
       <p class="eyebrow">회중 서기</p>
       <h1>회중 봉사 보고 현황</h1>
       <p class="sum">${esc(plabel)} · 전체 제출 <b>${totalS}</b> / 성원 ${totalM} · 미제출 <b>${totalM - totalS}</b></p>
+      <button class="primary" id="export-report-xlsx">엑셀 파일 다운로드</button>
       <div class="rlist">${blocks.join('')}</div>
       <button class="link" id="back">← 뒤로</button>
     `);
+    const exportBtn = document.getElementById('export-report-xlsx');
+    if (exportBtn) exportBtn.onclick = () => downloadSecretaryReportWorkbook(exportRows, groupSummaryRows, plabel);
     backBtn();
   } catch (e) {
     shell(`<h1>회중 봉사 보고 현황</h1><p class="err">${esc(e.message)}</p><button class="link" id="back">← 뒤로</button>`); backBtn();
   }
+}
+
+function buildSecretaryReportCsvRow({ periodLabel, groupLabel, member, report, submitted }) {
+  const pioneerType = report.pioneerType || (report.auxiliaryPioneer ? 'auxiliary' : '');
+  const pioneerLabel = {
+    regular: '정규 파이오니아',
+    auxiliary: '보조 파이오니아',
+    special: '특별 파이오니아'
+  }[pioneerType] || '';
+  return {
+    보고월: periodLabel,
+    집단: groupLabel,
+    이름: member.name || report.memberName || '',
+    제출여부: submitted ? '제출 완료' : '미제출',
+    봉사참여: submitted ? (report.participated === true ? '참여' : '참여 없음') : '',
+    성서연구: submitted ? String(Number(report.bibleStudies) || 0) : '',
+    파이오니아구분: submitted ? pioneerLabel : '',
+    시간: submitted && (pioneerLabel || Number(report.hours)) ? String(Number(report.hours) || 0) : '',
+    메모: submitted ? String(report.memo || '') : '',
+    제출시각: submitted ? formatReportTimestamp(report.submittedAt) : ''
+  };
+}
+
+async function downloadSecretaryReportWorkbook(rows, groupSummaryRows, periodLabel) {
+  const XLSX = await import('xlsx');
+  const wb = XLSX.utils.book_new();
+  const allRows = rows.slice();
+  const submittedRows = allRows.filter((row) => row.제출여부 === '제출 완료');
+  const generalRows = submittedRows.filter((row) => !row.파이오니아구분);
+  const regularRows = submittedRows.filter((row) => row.파이오니아구분 === '정규 파이오니아');
+  const auxiliaryRows = submittedRows.filter((row) => row.파이오니아구분 === '보조 파이오니아');
+  const missingRows = allRows
+    .filter((row) => row.제출여부 === '미제출')
+    .map((row) => ({ 보고월: row.보고월, 집단: row.집단, 이름: row.이름, 제출여부: row.제출여부 }));
+
+  appendSheet(XLSX, wb, '전체 보고', allRows);
+  appendSheet(XLSX, wb, '일반 참여', generalRows);
+  appendSheet(XLSX, wb, '정규 파이오니아', regularRows);
+  appendSheet(XLSX, wb, '보조 파이오니아', auxiliaryRows);
+  appendSheet(XLSX, wb, '미제출', missingRows);
+  appendSheet(XLSX, wb, '집단별 집계', groupSummaryRows);
+
+  const safePeriod = String(periodLabel || '봉사보고').replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '_');
+  const data = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([data], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `회중_봉사보고_${safePeriod}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function appendSheet(XLSX, wb, name, rows) {
+  const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{}]);
+  const headers = rows.length ? Object.keys(rows[0]) : [];
+  if (headers.length) {
+    ws['!cols'] = headers.map((h) => ({ wch: Math.max(10, h.length + 4, ...rows.map((row) => String(row[h] ?? '').length + 2).slice(0, 80)) }));
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(ws['!ref'])) };
+  }
+  XLSX.utils.book_append_sheet(wb, ws, name);
 }
 
 // ---------- 서기 성원 관리 ----------
