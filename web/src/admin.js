@@ -7,7 +7,11 @@ import { buildNoticePayload, normalizeEditorSource } from './notice-content.js';
 import { resolveAdminLoginDefaults, shouldAutoStartStandaloneAdmin } from './admin-entry.js';
 import { compressImage, nextNoticePageIndex, sortNoticePages } from './notice-images.js';
 import { NOTICE_LABELS } from './notice-labels.js';
-import { CONG_NOTICE_KEY, BOARD_NOTICE_KEYS, isBoardNoticeKey, buildCongItemPayload, buildCongItemSoftDeletePayload, congItemPreview, sortCongItems } from './cong-board.js';
+import {
+  CONG_NOTICE_KEY, BOARD_NOTICE_KEYS, isBoardNoticeKey,
+  buildCongItemPayload, buildCongItemSoftDeletePayload, congItemPreview, sortCongItems,
+  defaultNoticeExpiryDate, dateInputValue, dateFromInput
+} from './cong-board.js';
 import { parseMwbWeeks, buildMidBodyAll, parseMidBody, mergeWeeks, pruneExpired, weekSortKey } from './mwb-parse.js';
 import { titleByNo, noByTitle, numberedTitle, isRetiredTalkNo, RETIRED_FROM } from './talk-titles.js';
 import { defaultDutyData, parseDutyData, buildDutyHtml, buildDutyPlain } from './duty.js';
@@ -571,6 +575,7 @@ async function congBoardScreen(key = CONG_NOTICE_KEY, msg = '') {
               ${item.visible === false ? '<span class="muted"> · 숨김</span>' : ''}
               ${item.urgent ? '<span class="badge">긴급</span>' : ''}
               <br><span class="muted">${esc(congItemPreview(item))}</span>
+              ${item.expiresAt ? `<br><span class="muted">게시 종료일 ${esc(dateInputValue(item.expiresAt))}</span>` : ''}
             </div>
             <div class="member-actions">
               <button class="mini" data-edit="${esc(item.id)}">수정</button>
@@ -613,6 +618,8 @@ async function congItemEditScreen(key, item) {
   const label = NOTICE_LABELS[key] || '회중 광고';
   const editing = !!item?.id;
   const itemId = item?.id || doc(collection(db, 'notices', key, 'items')).id;
+  const defaultExpiry = key === 'branch' ? defaultNoticeExpiryDate() : null;
+  const expiryValue = dateInputValue(item?.expiresAt || defaultExpiry);
   shell(`
     <p class="eyebrow">${esc(whoLabel())}</p>
     <h1>${editing ? `${esc(label)} 수정` : `새 ${esc(label)}`}</h1>
@@ -626,6 +633,9 @@ async function congItemEditScreen(key, item) {
     <label class="chk"><input type="checkbox" id="visible" ${item?.visible !== false ? 'checked' : ''}/> 성원에게 표시</label>
     <label class="chk"><input type="checkbox" id="urgent" ${item?.urgent ? 'checked' : ''}/> 긴급 (빨간 강조)</label>
     <label class="chk"><input type="checkbox" id="pinned" ${item?.pinned ? 'checked' : ''}/> 목록 상단 고정</label>
+    <label>게시 종료일</label>
+    <input type="date" id="expires" value="${esc(expiryValue)}" />
+    <p class="muted">종료일이 지나면 성원 화면 목록에서 자동으로 보이지 않습니다. 지부 서신은 기본 2개월 후로 잡힙니다.</p>
     <button class="primary" id="save">저장</button>
     <p id="msg" class="savemsg"></p>
     <div id="item-pages"></div>
@@ -660,6 +670,7 @@ async function congItemEditScreen(key, item) {
         visible: document.getElementById('visible').checked,
         urgent: document.getElementById('urgent').checked,
         pinned: document.getElementById('pinned').checked,
+        expiresAt: dateFromInput(document.getElementById('expires').value),
         createdAt: item?.createdAt
       }, session.uid, serverTimestamp());
       document.getElementById('save').disabled = true;

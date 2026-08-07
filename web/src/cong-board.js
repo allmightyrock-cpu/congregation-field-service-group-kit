@@ -16,6 +16,7 @@ export function buildCongItemPayload({
   visible = true,
   urgent = false,
   pinned = false,
+  expiresAt = null,
   createdAt = null
 } = {}, uid, timestamp) {
   const cleanTitle = String(title || '').trim();
@@ -28,6 +29,7 @@ export function buildCongItemPayload({
     visible: visible !== false,
     urgent: urgent === true,
     pinned: pinned === true,
+    expiresAt: normalizeExpiryDate(expiresAt),
     createdAt: createdAt || timestamp,
     updatedAt: timestamp,
     updatedBy: uid
@@ -48,7 +50,7 @@ export function buildCongItemSoftDeletePayload(uid, timestamp) {
 export function sortCongItems(items = [], opts = {}) {
   const { visibleOnly = false } = opts;
   return [...items]
-    .filter((item) => !visibleOnly || item.visible === true)
+    .filter((item) => !visibleOnly || isCongItemVisible(item))
     .sort((a, b) => {
       const pinned = Number(b.pinned === true) - Number(a.pinned === true);
       if (pinned) return pinned;
@@ -103,4 +105,49 @@ export function timestampMillis(value) {
   if (typeof value === 'number') return value;
   if (typeof value.seconds === 'number') return value.seconds * 1000;
   return 0;
+}
+
+export function isCongItemVisible(item = {}, now = new Date()) {
+  if (item.visible !== true) return false;
+  const expires = timestampMillis(item.expiresAt);
+  if (!expires) return true;
+  return expires >= startOfToday(now).getTime();
+}
+
+export function defaultNoticeExpiryDate(base = new Date(), months = 2) {
+  const d = new Date(base);
+  d.setHours(23, 59, 59, 999);
+  d.setMonth(d.getMonth() + months);
+  return d;
+}
+
+export function dateInputValue(value) {
+  const millis = timestampMillis(value);
+  if (!millis) return '';
+  const d = new Date(millis);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+export function dateFromInput(value) {
+  const text = String(value || '').trim();
+  if (!text) return null;
+  const [yyyy, mm, dd] = text.split('-').map(Number);
+  if (!yyyy || !mm || !dd) return null;
+  return new Date(yyyy, mm - 1, dd, 23, 59, 59, 999);
+}
+
+function normalizeExpiryDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  const millis = timestampMillis(value);
+  return millis ? new Date(millis) : null;
+}
+
+function startOfToday(now) {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  return d;
 }

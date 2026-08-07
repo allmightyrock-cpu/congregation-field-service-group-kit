@@ -1209,6 +1209,24 @@ function previewOf(n) {
   return getNoticePreview(n).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+function shortenRosterGroupLabels(html) {
+  let out = String(html || '');
+  for (const group of groupEntries()) {
+    const base = group.label.replace(/\s*집단\s*$/u, '').trim();
+    if (!base) continue;
+    const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    out = out.replace(new RegExp(`${escapedBase}\\s*야외\\s*봉사\\s*집단`, 'gu'), `${base} 집단`);
+    out = out.replace(new RegExp(`${escapedBase}\\s*야외봉사\\s*집단`, 'gu'), `${base} 집단`);
+  }
+  return out;
+}
+
+function isRosterCongItem(item = {}, key = '') {
+  if (key === 'roster') return true;
+  if (String(item.id || '') === 'fixed-roster') return true;
+  return /집단\s*편성표/u.test(String(item.title || ''));
+}
+
 async function openNoticeDetail(n, options = {}) {
   if (!n) return openNotices();
   const nkey = n.id || n.key;
@@ -1222,12 +1240,13 @@ async function openNoticeDetail(n, options = {}) {
 
   const { getNoticeDisplayHtml } = await import('./notice-display.js');
   if (!isActiveNav(seq)) return;
-  const bodyHtml = getNoticeDisplayHtml(n);
+  const isRosterNotice = nkey === 'roster';
+  const rawBodyHtml = getNoticeDisplayHtml(n);
+  const bodyHtml = isRosterNotice ? shortenRosterGroupLabels(rawBodyHtml) : rawBodyHtml;
   const hasBody = bodyHtml.trim();
   // 광고 PDF → 이미지 페이지가 있으면 이미지로 표시(카톡 포함 어디서나 확실)
   let pages = [];
   try { pages = await getNoticePages(n.id || n.key); } catch { pages = []; }
-  const isRosterNotice = nkey === 'roster';
   const showRosterPages = !(isRosterNotice && hasBody);
   const pagesHtml = pages.length && showRosterPages
     ? `<div class="notice-pages ${isRosterNotice ? 'notice-pages-roster' : ''}">${pages.map((p) =>
@@ -1261,7 +1280,8 @@ async function openCongNoticeBoard(parentNotice = null, options = {}) {
     let legacyHtml = '';
     if (!items.length && parentNotice) {
       const { getNoticeDisplayHtml } = await import('./notice-display.js');
-      const bodyHtml = getNoticeDisplayHtml(parentNotice);
+      const rawBodyHtml = getNoticeDisplayHtml(parentNotice);
+      const bodyHtml = key === 'roster' ? shortenRosterGroupLabels(rawBodyHtml) : rawBodyHtml;
       let pages = [];
       try { pages = await getNoticePages(key); } catch { pages = []; }
       const pagesHtml = pages.length
@@ -1322,7 +1342,8 @@ async function openCongNoticeItem(item, options = {}) {
   writeSeenCongItems(markCongItemSeen(readSeenCongItems(), item));
   const { getNoticeDisplayHtml } = await import('./notice-display.js');
   if (!isActiveNav(seq)) return;
-  const bodyHtml = getNoticeDisplayHtml(item);
+  const rawBodyHtml = getNoticeDisplayHtml(item);
+  const bodyHtml = isRosterCongItem(item, key) ? shortenRosterGroupLabels(rawBodyHtml) : rawBodyHtml;
   const hasBody = bodyHtml.trim();
   let pages = [];
   try { pages = await getCongNoticeItemPages(item.id, key); } catch { pages = []; }

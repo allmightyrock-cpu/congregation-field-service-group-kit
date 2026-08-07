@@ -4,7 +4,7 @@ import { signInWithCustomToken } from 'firebase/auth';
 import {
   doc, getDoc, collection, getDocs, query, where, orderBy, setDoc, serverTimestamp
 } from 'firebase/firestore';
-import { CONG_NOTICE_KEY, sortCongItems } from './cong-board.js';
+import { CONG_NOTICE_KEY, sortCongItems, isCongItemVisible } from './cong-board.js';
 
 let signedInGroup = null;
 
@@ -116,7 +116,7 @@ export async function getCongNoticeItems(key = CONG_NOTICE_KEY) {
   ));
   const arr = [];
   snap.forEach((d) => arr.push({ id: d.id, ...d.data() }));
-  return sortCongItems(arr, { visibleOnly: true });
+  return sortCongItems(arr.filter((item) => isCongItemVisible(item)), { visibleOnly: true });
 }
 
 export async function getCongNoticeItemPages(itemId, key = CONG_NOTICE_KEY) {
