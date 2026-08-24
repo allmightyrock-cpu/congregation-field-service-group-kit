@@ -55,7 +55,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  background: var(--accent);
+  background: linear-gradient(135deg, #174982, #2363aa);
   color: #fff;
   font-weight: 900;
   line-height: 1;
@@ -3076,4 +3076,150 @@ h2.sec { font-size: 16px; color: #66788a; margin: 26px 0 10px; }
     padding-right: 10px;
     font-size: 14px;
   }
+}
+
+/* ===== 홈 재설계 (단일 컬럼 카드 흐름 + 하단 탭바) — 1단계 ===== */
+.has-bottomnav .fsg-hero-copy { padding-bottom: 82px; }
+.fsg-home {
+  position: relative;
+  z-index: 2;
+  max-width: 860px;
+  margin: -54px auto 0;
+  padding: 0 20px calc(96px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  word-break: keep-all;
+}
+.home-section-title {
+  margin: 16px 2px 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: #1b2531;
+}
+.home-card {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid var(--fsg-line);
+  border-radius: 4px;
+  background: #fff;
+  color: #17191c;
+  text-align: left;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, .10);
+  cursor: pointer;
+}
+.home-chevron { display: grid; place-items: center; color: #8a94a2; }
+.home-chevron .fsg-icon { width: 20px; height: 20px; }
+.home-chevron .fsg-icon svg { width: 20px; height: 20px; }
+
+/* 이번 주 나의 임명 */
+.home-assignment { position: relative; padding: 22px; display: flex; flex-direction: column; gap: 16px; }
+.home-card-title { display: block; font-size: 20px; font-weight: 900; }
+.home-card-body { display: grid; grid-template-columns: 84px 1fr; gap: 18px; align-items: center; }
+.home-round-icon {
+  width: 84px; height: 84px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: #eef2f8; color: var(--accent-deep);
+}
+.home-round-icon .fsg-icon, .home-round-icon .fsg-icon svg { width: 42px; height: 42px; }
+.home-card-text b { display: block; margin-bottom: 6px; font-size: 18px; }
+.home-card-text > span { display: block; color: #5f6772; font-size: 14px; line-height: 1.6; }
+.home-assignment .home-chevron { position: absolute; top: 22px; right: 18px; }
+
+/* 봉사 보고 */
+.home-report {
+  display: grid; grid-template-columns: 72px 1fr 30px; gap: 18px; align-items: center;
+  padding: 22px; border: 0;
+  background: linear-gradient(135deg, #184e92, #2468b8);
+  color: #fff; box-shadow: 0 7px 18px rgba(25, 87, 158, .28);
+}
+/* 보고 기간이 닫혀 있어도 디자이너 샘플처럼 파란색 유지(로고 마크와 색 통일) */
+.home-report-icon {
+  width: 64px; height: 64px; border-radius: 4px;
+  display: grid; place-items: center; background: rgba(255,255,255,.16);
+}
+.home-report-icon .fsg-icon, .home-report-icon .fsg-icon svg { width: 34px; height: 34px; }
+.home-report-text b { display: block; margin-bottom: 4px; font-size: 22px; }
+.home-report-text em { display: block; font-style: normal; color: #eaf1ff; font-size: 15px; }
+.home-report .home-chevron { color: rgba(255,255,255,.85); }
+
+/* 최근 안내 · 집단 공지 카드 (base .notice-card 재정의) */
+.fsg-home .notice-card {
+  width: 100%; margin: 0; padding: 18px 20px;
+  display: grid; grid-template-columns: 84px 1px 1fr 30px; gap: 20px; align-items: center;
+  border: 1px solid var(--fsg-line); border-left: 1px solid var(--fsg-line);
+  background: #fff; box-shadow: 0 6px 18px rgba(15,23,42,.10);
+}
+.fsg-home .notice-icon { justify-self: center; color: var(--accent-deep); display: grid; place-items: center; }
+.fsg-home .notice-icon .fsg-icon, .fsg-home .notice-icon .fsg-icon svg { width: 27px; height: 27px; }
+.fsg-home .notice-divider { width: 1px; height: 44px; background: var(--fsg-line); justify-self: center; }
+.fsg-home .notice-text b { display: block; color: var(--accent-deep); font-size: 18px; line-height: 1.32; }
+.fsg-home .notice-text em { display: block; font-style: normal; color: #17191c; font-size: 15px; }
+.fsg-home .notice-text small { display: block; margin-top: 4px; color: #5f6772; font-size: 13px; }
+.fsg-home .notice-list { display: block; border: 1px solid var(--fsg-line); border-radius: 4px; overflow: hidden; background: #fff; box-shadow: 0 6px 18px rgba(15,23,42,.10); }
+.fsg-home .notice-list .notice-card { border: 0; border-radius: 0; box-shadow: none; }
+.fsg-home .notice-list .notice-card + .notice-card { border-top: 1px solid var(--fsg-line); }
+
+/* 홈 안에 들어가는 보고현황·보조도구 박스 여백 정리 */
+.fsg-home .home-report-status-box { margin: 4px 0 0; padding: 16px; border: 1px solid var(--fsg-line); }
+.fsg-home .home-feature-wrap { margin: 6px 0 0; }
+
+/* 하단 탭바 */
+.fsg-bottomnav {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 0;
+  width: 100%; max-width: 1140px; z-index: 40;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--fsg-line); background: #fff;
+  padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+  box-shadow: 0 -4px 14px rgba(0,0,0,.06);
+}
+.fsg-bottomnav button {
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  min-height: 56px; border: 0; background: transparent; color: #55606e;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.fsg-bottomnav button.on { color: var(--accent-deep); }
+.fsg-bottomnav .fsg-icon, .fsg-bottomnav .fsg-icon svg { width: 24px; height: 24px; }
+
+/* 토스트 팝업(잠깐 떴다 사라짐) */
+#fsg-toast-host {
+  position: fixed; left: 0; right: 0; bottom: calc(90px + env(safe-area-inset-bottom));
+  z-index: 55; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 0 16px; pointer-events: none;
+}
+.fsg-toast {
+  max-width: 440px; background: rgba(27, 37, 49, .95); color: #fff;
+  padding: 13px 18px; border-radius: 10px; text-align: center; line-height: 1.4;
+  font-size: 14px; font-weight: 700; box-shadow: 0 10px 28px rgba(0,0,0,.3);
+  opacity: 0; transform: translateY(12px); transition: opacity .28s ease, transform .28s ease;
+}
+.fsg-toast.show { opacity: 1; transform: translateY(0); }
+.fsg-toast-sub { display: block; margin-top: 5px; font-size: 12px; font-weight: 500; color: #cfd7e2; }
+
+/* 전체 메뉴 시트 (홈에서 하단탭으로 열림) */
+.has-bottomnav .fsg-mega {
+  position: fixed; inset: 0; z-index: 60; margin: 0;
+  padding: calc(20px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom));
+  overflow-y: auto; background: #fff; border: 0; box-shadow: none;
+}
+.has-bottomnav .fsg-mega[hidden] { display: none; }
+.has-bottomnav .fsg-mega-inner { max-width: 720px; }
+.has-bottomnav .fsg-mega-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px 20px; }
+.fsg-mega-group { margin-bottom: 22px; }
+.fsg-mega-group h3 {
+  margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--fsg-line);
+  font-size: 14px; font-weight: 800; letter-spacing: .04em; color: #55606e;
+}
+
+@media (max-width: 560px) {
+  .fsg-home { padding-left: 14px; padding-right: 14px; margin-top: -46px; }
+  .home-card-body { grid-template-columns: 66px 1fr; gap: 14px; }
+  .home-round-icon { width: 66px; height: 66px; }
+  .home-round-icon .fsg-icon, .home-round-icon .fsg-icon svg { width: 32px; height: 32px; }
+  .home-card-title { font-size: 18px; }
+  .home-report { grid-template-columns: 56px 1fr 26px; gap: 14px; padding: 18px; }
+  .home-report-icon { width: 56px; height: 56px; }
+  .home-report-text b { font-size: 20px; }
+  .fsg-home .notice-card { grid-template-columns: 52px 1px 1fr 26px; gap: 14px; padding: 16px 14px; }
+  .fsg-home .notice-text b { font-size: 16px; }
 }

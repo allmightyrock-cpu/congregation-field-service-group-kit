@@ -87,11 +87,15 @@ function iconHtml(name) {
     notice: '<path d="M4 11v4h4l8 4V7l-8 4z"></path><path d="M18 10c1 .8 1 2.2 0 3"></path><path d="m7 15 1 5"></path>',
     list: '<path d="M8 7h12M8 12h12M8 17h12"></path><circle cx="4" cy="7" r="1"></circle><circle cx="4" cy="12" r="1"></circle><circle cx="4" cy="17" r="1"></circle>',
     user: '<circle cx="12" cy="8" r="4"></circle><path d="M4 21c1.7-4 4.4-6 8-6s6.3 2 8 6"></path>',
-    key: '<circle cx="8" cy="15" r="4"></circle><path d="m11 12 8-8"></path><path d="m16 7 2 2"></path><path d="m14 9 2 2"></path>'
+    key: '<circle cx="8" cy="15" r="4"></circle><path d="m11 12 8-8"></path><path d="m16 7 2 2"></path><path d="m14 9 2 2"></path>',
+    clipboard: '<path d="M9 4h6"></path><path d="M9 4a3 3 0 0 0-3 3v13h12V7a3 3 0 0 0-3-3"></path><path d="M9 4a3 3 0 0 1 6 0"></path><path d="M9 12h6M9 16h4"></path>',
+    people: '<circle cx="9" cy="8" r="3.4"></circle><path d="M3.5 20c0-3.4 2.5-5 5.5-5s5.5 1.6 5.5 5"></path><path d="M16.5 15.2c2.4.4 4 1.9 4 4.8"></path><path d="M16 8.6a3 3 0 0 1 0 5.2"></path>',
+    grid: '<rect x="4" y="4" width="6" height="6" rx="1"></rect><rect x="14" y="4" width="6" height="6" rx="1"></rect><rect x="4" y="14" width="6" height="6" rx="1"></rect><rect x="14" y="14" width="6" height="6" rx="1"></rect>',
+    chevron: '<path d="m9 6 6 6-6 6"></path>'
   };
   return `<span class="fsg-icon"><svg viewBox="0 0 24 24" aria-hidden="true">${icons[name] || icons.home}</svg></span>`;
 }
-function siteTopHtml(active = 'home') {
+function siteTopHtml(active = 'home', opts = {}) {
   const groupLoggedIn = editorSession?.scope === 'group';
   const supervisorDisabled = !state.g && !groupLoggedIn;
   const supervisorLabel = groupLoggedIn ? '감독자 로그아웃' : '감독자 로그인';
@@ -109,9 +113,9 @@ function siteTopHtml(active = 'home') {
       <div class="fsg-brand">${fsgMarkHtml()}<span class="fsg-brand-title">회중 야외 봉사 집단</span></div>
       <button class="fsg-login ${supervisorDisabled ? 'is-disabled' : ''}" id="go-admin-top" type="button" ${supervisorDisabled ? 'disabled aria-disabled="true" title="집단 화면에서 사용할 수 있습니다."' : ''}>${iconHtml('user')}${supervisorLabel}</button>
     </header>
-    <nav class="fsg-nav">
+    ${opts.hideNav ? '' : `<nav class="fsg-nav">
       ${nav.map(([key, label, icon]) => `<button class="${active === key ? 'on' : ''}" type="button" data-fsg-nav="${key}">${iconHtml(icon)}${esc(label)}</button>`).join('')}
-    </nav>
+    </nav>`}
     <section class="fsg-mega" id="fsg-mega" hidden>
       <button class="fsg-mega-close" id="fsg-mega-close" type="button" aria-label="상세 메뉴 닫기">×</button>
       <div class="fsg-mega-inner" id="fsg-mega-inner"></div>
@@ -216,7 +220,79 @@ function megaMenuHtml(key) {
         ${megaLink('admin-group', 'user', '감독자 로그인', state.g ? '집단 감독자·보조자 전용' : '집단 화면에서만 사용할 수 있습니다', { disabled: !state.g })}
       </div>`;
   }
+  if (key === 'all') {
+    const adminInner = editorSession
+      ? `<div class="fsg-mega-grid">${loggedInAdminLinks()}</div>`
+      : `<div class="fsg-mega-grid">
+          ${megaLink('admin-role', 'key', '회중 역할자 로그인', '조정자, 서기, 봉사 감독자 등')}
+          ${megaLink('admin-group', 'user', '감독자 로그인', state.g ? '집단 감독자·보조자 전용' : '집단 화면에서만 사용할 수 있습니다', { disabled: !state.g })}
+        </div>`;
+    return `<h2>${iconHtml('grid')}전체 메뉴</h2>
+      <div class="fsg-mega-group">
+        <h3>나의 임명</h3>
+        <div class="fsg-mega-grid">
+          ${megaLink('assignment-hub', 'calendar', '나의 임명 전체', '개인·집단 임명 확인 입구')}
+          ${megaLink('mid', 'calendar', '평일 집회 임명표', '프로그램, 사회, 기도, 낭독 임명')}
+          ${megaLink('talk', 'notice', '주말 성서공개강연', '사회, 낭독, 마치는 기도 임명')}
+          ${megaLink('duty', 'list', '월 단위 개인 임명', '주차, 안내, 연사 음료, 청소 임명')}
+        </div>
+      </div>
+      <div class="fsg-mega-group">
+        <h3>광고 · 안내</h3>
+        <div class="fsg-mega-grid">
+          ${megaLink('notices', 'notice', '광고·안내 전체', '회중 광고와 지부 서신 목록')}
+          ${megaLink('cong', 'notice', '회중 광고', '회중 전체에 내려온 안내')}
+          ${megaLink('branch', 'report', '지부 광고 서신', '첨부 문서와 공지 확인')}
+          ${megaLink('groupnews', 'list', '우리 집단 소식', '집단 성원에게만 전하는 소식')}
+          ${megaLink('visit', 'calendar', '봉사 감독자 방문', '우리 집단 방문 계획')}
+        </div>
+      </div>
+      <div class="fsg-mega-group">
+        <h3>집단 편성표</h3>
+        <div class="fsg-mega-grid">
+          ${megaLink('roster', 'list', '집단 편성표', '집단 구성과 담당자 확인')}
+          ${megaLink('allgroups', 'home', '전체 야외 봉사 집단', '회중 전체 집단 목록')}
+        </div>
+      </div>
+      <div class="fsg-mega-group">
+        <h3>보조 도구</h3>
+        <div class="fsg-mega-grid">
+          ${megaLink('jwscript', 'report', '동영상 자막 추출', 'jw.org 동영상 자막을 개인 연구용 텍스트로 정리')}
+        </div>
+      </div>
+      <div class="fsg-mega-group">
+        <h3>편집자</h3>
+        ${adminInner}
+      </div>`;
+  }
   return '';
+}
+
+function bottomNavHtml(active = 'home') {
+  const items = [
+    ['home', '홈', 'home'],
+    ['report', '봉사 보고', 'report'],
+    ['assignments', '나의 임명', 'calendar'],
+    ['menu', '전체 메뉴', 'grid']
+  ];
+  return `<nav class="fsg-bottomnav" aria-label="주 메뉴">
+    ${items.map(([key, label, icon]) => `<button class="${active === key ? 'on' : ''}" type="button" data-bottom-nav="${key}">${iconHtml(icon)}<span>${esc(label)}</span></button>`).join('')}
+  </nav>`;
+}
+
+function bindBottomNav(reportOpen) {
+  document.querySelectorAll('[data-bottom-nav]').forEach((button) => {
+    button.onclick = () => {
+      const key = button.dataset.bottomNav;
+      if (key === 'home') return goHome();
+      if (key === 'assignments') return openAssignmentHub();
+      if (key === 'menu') return showMegaMenu('all');
+      if (key === 'report') {
+        if (reportOpen) return openReportNames();
+        return reportClosedToast();
+      }
+    };
+  });
 }
 
 function showMegaMenu(key) {
@@ -581,21 +657,40 @@ window.addEventListener('popstate', (event) => {
   renderFromHistory(event.state);
 });
 // ---------- 화면들 ----------
+function showToast(html, ms = 3200) {
+  let host = document.getElementById('fsg-toast-host');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'fsg-toast-host';
+    document.body.appendChild(host);
+  }
+  const el = document.createElement('div');
+  el.className = 'fsg-toast';
+  el.innerHTML = html;
+  host.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 320);
+  }, ms);
+}
+
+function reportClosedToast() {
+  showToast(`봉사 보고 기간이 아닙니다<span class="fsg-toast-sub">매월 말일 전날 ~ 다음 달 10일 · ${esc(state.config.periodLabel)} 마감 ${esc(state.config.deadlineLabel)}</span>`);
+}
+
 function screenHome(options = {}) {
   enterScreen('home', {}, { replace: true, ...options });
   if (!options.fromHistory) appHistoryDepth = 0;
   const open = state.config.reportOpen === true;
-  const reportPanel = open
-    ? `<div class="fsg-report-panel">
-        <div><span class="badge">이번 달</span><h2>온라인 봉사 보고</h2><p>${esc(state.config.periodLabel)} 보고 · 마감 ${esc(state.config.deadlineLabel)}</p></div>
-        <button class="primary" id="go-report" type="button">보고 제출</button>
-      </div>`
-    : `<div class="notice-off fsg-report-closed">봉사 보고는 매월 말일 전날부터 다음 달 10일까지 할 수 있어요.<br><span class="muted">${esc(state.config.periodLabel)} 보고 마감은 ${esc(state.config.deadlineLabel)}입니다.</span></div>`;
   const dateLabel = todayDateLabel();
   const dailyTextUrl = todayDailyTextUrl();
+  const reportStatusBox = canSeeReportSummary()
+    ? `<section class="sidebox restricted home-report-status-box" id="home-report-status">${reportSummaryPlaceholderHtml()}</section>`
+    : '';
   wideShell(`
-    <div class="fsg-site">
-      ${siteTopHtml('home')}
+    <div class="fsg-site has-bottomnav">
+      ${siteTopHtml('home', { hideNav: true })}
       <section class="fsg-hero">
         <div class="fsg-hero-visual" style="background-image:linear-gradient(90deg, rgba(255,255,255,.16), rgba(255,255,255,0) 38%, rgba(0,0,0,.08)), url('/field-service-hero-original.png')"></div>
         <div class="fsg-hero-copy">
@@ -606,59 +701,63 @@ function screenHome(options = {}) {
           </div>
           <h1>오늘의 봉사와 임명을 한눈에 확인하세요</h1>
           <p>성원은 온라인 봉사 보고를 제출하고, 자신에게 배정된 봉사·청소·집회 관련 임명을 확인할 수 있습니다.</p>
-          ${open ? '<button class="fsg-hero-button" id="go-report-hero" type="button">온라인 보고하기</button>' : ''}
         </div>
       </section>
-      <div class="fsg-quick">
-        <button type="button" data-home-feature="report"><b>온라인 봉사 보고</b><span>${open ? '이번 달 봉사 보고 제출' : '보고 기간 안내'}</span></button>
-        <button type="button" data-home-feature="assignment-hub"><b>나의 임명</b><span>봉사·청소·집회 관련 임명 확인</span></button>
-        <button type="button" data-home-feature="notices"><b>회중 광고</b><span>최근 안내와 첨부 자료</span></button>
-        <button type="button" data-home-feature="roster"><b>집단 편성표</b><span>집단 구성과 담당자 확인</span></button>
-      </div>
-      <main class="fsg-content">
-        <section>
-          ${newNoticeBannerHtml()}
-          ${reportPanel}
-          <h2 class="section-title">최근 안내</h2>
-          <button class="fsg-list-card" id="go-notices" type="button"><span><b>광고·안내 보기</b><em>회중 광고, 지부 광고 서신, 집단 소식 확인</em></span><strong>열기</strong></button>
-          <article class="daily-bible-card">
-            <span class="daily-bible-date">${esc(dateLabel)}</span>
-            <button class="daily-text-card" id="go-daily-text" type="button">
-              <span class="daily-bible-kicker">날마다 성경을 검토함</span>
-              <span class="daily-text-title">오늘의 성구와 해설 보기</span>
-            </button>
-          </article>
-        </section>
-        <aside class="fsg-side">
-          <section class="sidebox">
-            <h2>나의 임명</h2>
-            <div class="week-summary"><b>이번 주 임명 확인</b><span>역할자가 입력한 임명표에서 이번 주 해당 내용을 확인합니다.</span></div>
-            <button class="fsg-duty-link" type="button" data-home-feature="assignment-meetings"><b>평일 집회·공개강연 임명</b><span>사회, 낭독, 기도, 프로그램 임명 확인</span></button>
-            <button class="fsg-duty-link" type="button" data-home-feature="assignment-monthly"><b>월 단위 개인 임명</b><span>주차, 안내, 연사 음료 확인</span></button>
-            <button class="fsg-duty-link" type="button" data-home-feature="assignment-group"><b>우리 집단 임명</b><span>집단별 청소 임명 확인</span></button>
-          </section>
-          <section class="sidebox">
-            <h2>봉사 보고 안내</h2>
-            <div class="notice-card"><b>${open ? '봉사 보고 기간입니다' : '보고 기간 안내'}</b><span>${open ? '아직 보고하지 않았다면 이번 달 보고를 제출해 주세요.' : `${esc(state.config.periodLabel)} 보고 마감은 ${esc(state.config.deadlineLabel)}입니다.`}</span></div>
-          </section>
-          <section class="sidebox restricted" id="home-report-status">
-            ${reportSummaryPlaceholderHtml()}
-          </section>
-        </aside>
+      <main class="fsg-home">
+        ${newNoticeBannerHtml()}
+        <button class="home-card home-assignment" type="button" data-home-feature="assignment-hub">
+          <span class="home-card-title">이번 주 나의 임명</span>
+          <span class="home-card-body">
+            <span class="home-round-icon">${iconHtml('clipboard')}</span>
+            <span class="home-card-text"><b>이번 주 임명 확인</b><span>역할자가 입력한 임명표에서 이번 주 해당 내용을 확인합니다.</span></span>
+          </span>
+          <span class="home-chevron">${iconHtml('chevron')}</span>
+        </button>
+        <button class="home-card home-report ${open ? 'is-open' : 'is-closed'}" type="button" data-home-feature="report">
+          <span class="home-report-icon">${iconHtml('report')}</span>
+          <span class="home-report-text"><b>봉사 보고</b><em>${open ? '이번 달 봉사 보고 제출' : '보고 기간 안내'}</em></span>
+          <span class="home-chevron">${iconHtml('chevron')}</span>
+        </button>
+        <h2 class="home-section-title">최근 안내</h2>
+        <button class="home-card notice-card home-daily" id="go-daily-text" type="button">
+          <span class="notice-icon">${iconHtml('calendar')}</span>
+          <span class="notice-divider"></span>
+          <span class="notice-text"><em>${esc(dateLabel)}</em><b>오늘의 성구와 해설 보기</b></span>
+          <span class="home-chevron">${iconHtml('chevron')}</span>
+        </button>
+        <h2 class="home-section-title">집단 공지</h2>
+        <div class="notice-list">
+          <button class="home-card notice-card" type="button" data-home-feature="assignment-meetings">
+            <span class="notice-icon">${iconHtml('notice')}</span>
+            <span class="notice-divider"></span>
+            <span class="notice-text"><b>평일 집회 · 공개강연 임명</b><small>사회, 낭독, 기도, 프로그램 임명 확인</small></span>
+            <span class="home-chevron">${iconHtml('chevron')}</span>
+          </button>
+          <button class="home-card notice-card" type="button" data-home-feature="assignment-monthly">
+            <span class="notice-icon">${iconHtml('calendar')}</span>
+            <span class="notice-divider"></span>
+            <span class="notice-text"><b>월 단위 개인 임명</b><small>주차, 안내, 연사 음료 확인</small></span>
+            <span class="home-chevron">${iconHtml('chevron')}</span>
+          </button>
+          <button class="home-card notice-card" type="button" data-home-feature="assignment-group">
+            <span class="notice-icon">${iconHtml('people')}</span>
+            <span class="notice-divider"></span>
+            <span class="notice-text"><b>우리 집단 임명</b><small>집단별 청소 임명 확인</small></span>
+            <span class="home-chevron">${iconHtml('chevron')}</span>
+          </button>
+        </div>
+        ${reportStatusBox}
       </main>
-      ${siteFooterHtml()}
+      ${bottomNavHtml('home')}
     </div>
   `);
   bindSiteTop(open);
-  document.querySelectorAll('#go-report, #go-report-hero').forEach((rb) => { rb.onclick = () => openReportNames(); });
-  document.getElementById('go-daily-text').onclick = () => window.open(dailyTextUrl, '_blank', 'noopener,noreferrer');
-  document.getElementById('go-notices').onclick = () => openNotices();
-  const jsb = document.getElementById('go-jw-script');
-  if (jsb) jsb.onclick = () => openJwScript();
+  bindBottomNav(open);
+  const dailyBtn = document.getElementById('go-daily-text');
+  if (dailyBtn) dailyBtn.onclick = () => window.open(dailyTextUrl, '_blank', 'noopener,noreferrer');
   const nb = document.getElementById('new-notice');
   if (nb) nb.onclick = () => state.newNotices.length === 1 ? openNoticeDetail(state.newNotices[0]) : openNotices();
   bindHomeFeatureGrid(open);
-  hydrateHomeFeatureGrid(open);
   bindHomeReportStatus();
   hydrateHomeReportSummary();
 }
@@ -698,8 +797,7 @@ function bindHomeFeatureGrid(reportOpen) {
       if (feature === 'roster' || feature === 'groups') return openNoticeByKey('roster');
       if (feature === 'report') {
         if (reportOpen) return openReportNames();
-        document.querySelector('.notice-off')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return;
+        return reportClosedToast();
       }
       if (feature === 'groupnews') return openGroupNewsFromHome();
       if (feature === 'jwscript') return openJwScript();

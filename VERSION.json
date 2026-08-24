@@ -1,13 +1,14 @@
 {
   "name": "Congregation Field Service Group Kit",
-  "version": "2026.08.05-current-design",
-  "date": "2026-08-05",
+  "version": "2026.08.24-bottomnav-design",
+  "date": "2026-08-24",
   "channel": "distribution",
   "notes": [
-    "Current visual design applied",
+    "New home design: bottom tab bar + full menu overlay (matches operating build)",
+    "home-card / home-assignment / home-report layout, report toast popup",
+    "PWA installable: manifest + icons + service worker",
+    "Beginner-friendly install guides added",
     "Role-based editor menu included",
-    "Group supervisor menu included",
-    "Publication and emergency contact tools included",
-    "Update helper added"
+    "Group supervisor menu included"
   ]
 }
