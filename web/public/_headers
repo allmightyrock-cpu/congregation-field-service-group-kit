@@ -1,0 +1,10 @@
+# Cloudflare Pages 응답 헤더
+# 런타임 설정 파일은 브라우저가 오래 캐시하면 설치 도우미가 값을 바꿔도 옛 값이 남는다 → 항상 재검증
+/config.js
+  Cache-Control: no-cache, max-age=0, must-revalidate
+
+/sw.js
+  Cache-Control: no-cache, max-age=0, must-revalidate
+
+/manifest.webmanifest
+  Cache-Control: no-cache, max-age=0, must-revalidate

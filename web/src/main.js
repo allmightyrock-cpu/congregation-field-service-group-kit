@@ -4,7 +4,8 @@ import {
   getCongNoticeItems, getCongNoticeItemPages, getTalks, getVisits, getBoard, getGroupPosts
 } from './data.js';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth, WORKER_URL } from './firebase.js';
+import { auth, WORKER_URL, CONFIG_MISSING } from './firebase.js';
+import { clearHeroBg, hasCustomHero, heroBgUrl, saveHeroBgFromFile } from './hero-custom.js';
 import { resolveReportConfig } from '../../shared/report-period.js';
 import { getNoticePreview } from './notice-content.js';
 import {
@@ -20,7 +21,7 @@ import {
   buildNewNoticeMessage, getNewNotices, markNoticeSeen, readSeenNotices, writeSeenNotices
 } from './notice-new.js';
 import { isDeprecatedNoticeKey } from './notice-labels.js';
-import { DUP_NAMES, resolveAssigneeGroup } from './mwb-parse.js';
+import { DUP_NAMES, resolveAssigneeGroup, weekSortKey } from './mwb-parse.js';
 import { numberedTitle } from './talk-titles.js';
 import { backButtonHtml, topbarHtml } from './mobile-nav.js';
 import { buildHistoryEntry, buildScreenUrl, normalizeHistoryEntry } from './history-nav.js';
@@ -71,7 +72,16 @@ function withTimeout(promise, ms, label) {
 function shell(inner) { app.innerHTML = `<section class="shell">${inner}</section>`; }
 function wideShell(inner) { app.innerHTML = `<section class="shell shell-wide">${inner}</section>`; }
 function header() {
-  return `<p class="eyebrow"><span style="color:var(--accent)">${esc(state.name)}</span> <span class="muted">야외 봉사 집단</span></p>`;
+  return `<p class="eyebrow"><span style="color:var(--accent)">${esc(displayGroupLabel(state.name))}</span></p>`;
+}
+// 집단 표시명 통일: "○○ 야외 봉사 집단" / "○○ 집단" / "○○" → "○○ 집단"
+function displayGroupLabel(name) {
+  const base = String(name || '')
+    .replace(/\s*야외\s*봉사\s*집단\s*$/u, '')
+    .replace(/\s*야외봉사\s*집단\s*$/u, '')
+    .replace(/\s*집단\s*$/u, '')
+    .trim();
+  return base ? `${base} 집단` : '집단';
 }
 function congNameLabel() {
   return state.config.congName || publicCongName || DEFAULT_CONG_NAME;
@@ -94,6 +104,10 @@ function iconHtml(name) {
     chevron: '<path d="m9 6 6 6-6 6"></path>'
   };
   return `<span class="fsg-icon"><svg viewBox="0 0 24 24" aria-hidden="true">${icons[name] || icons.home}</svg></span>`;
+}
+// 디자이너 제공 라인아트(PNG)를 단색 마스크로 렌더 → currentColor로 카드 색에 맞게 흰/파랑 자동 적용
+function iconImgHtml(name) {
+  return `<span class="fsg-icon"><i class="fsg-imgicon" style="--i:url('/ui-icons/${name}.png')"></i></span>`;
 }
 function siteTopHtml(active = 'home', opts = {}) {
   const groupLoggedIn = editorSession?.scope === 'group';
@@ -276,7 +290,7 @@ function bottomNavHtml(active = 'home') {
     ['menu', '전체 메뉴', 'grid']
   ];
   return `<nav class="fsg-bottomnav" aria-label="주 메뉴">
-    ${items.map(([key, label, icon]) => `<button class="${active === key ? 'on' : ''}" type="button" data-bottom-nav="${key}">${iconHtml(icon)}<span>${esc(label)}</span></button>`).join('')}
+    ${items.map(([key, label, icon]) => `<button class="${active === key ? 'on' : ''}" type="button" data-bottom-nav="${key}">${key === 'report' ? iconImgHtml('report') : iconHtml(icon)}<span>${esc(label)}</span></button>`).join('')}
   </nav>`;
 }
 
@@ -369,7 +383,7 @@ function editorSessionLabel() {
   if (!editorSession) return '';
   if (editorSession.scope === 'group') {
     const groupKey = (editorSession.claims.groupKeys || [])[0] || editorSession.key || state.g;
-    return `${GROUP_NAMES[groupKey] || '집단'} 감독자`;
+    return `${displayGroupLabel(GROUP_NAMES[groupKey] || '집단')} 감독자`;
   }
   return ROLE_SHORT_LABELS[editorSession.key || editorSession.claims.role] || '회중 역할자';
 }
@@ -476,7 +490,7 @@ async function hydrateHomeReportSummary() {
 }
 
 function groupEntries() {
-  return Object.entries(GROUP_NAMES).map(([key, name], index) => ({ key, name, index }));
+  return Object.entries(GROUP_NAMES).map(([key, name], index) => ({ key, name, label: displayGroupLabel(name), index }));
 }
 function currentGroupPosition() {
   const entries = groupEntries();
@@ -484,11 +498,7 @@ function currentGroupPosition() {
   return index >= 0 ? index + 1 : '';
 }
 function siteFooterHtml() {
-  const footerGroupName = (name) => {
-    const base = String(name || '').replace(/\s*야외\s*봉사\s*집단\s*$/u, '').replace(/\s*집단\s*$/u, '').trim();
-    return `${base} 집단`;
-  };
-  const links = groupEntries().map((g) => `<a href="?g=${esc(g.key)}">${esc(footerGroupName(g.name))}</a>`).join('');
+  const links = groupEntries().map((g) => `<a href="?g=${esc(g.key)}">${esc(g.label)}</a>`).join('');
   return `
     <footer class="fsg-footer">
       <a href="${location.pathname}"><strong>${esc(congNameLabel())}</strong> 야외 봉사 집단</a>
@@ -679,6 +689,42 @@ function reportClosedToast() {
   showToast(`봉사 보고 기간이 아닙니다<span class="fsg-toast-sub">매월 말일 전날 ~ 다음 달 10일 · ${esc(state.config.periodLabel)} 마감 ${esc(state.config.deadlineLabel)}</span>`);
 }
 
+// 홈 배경 사진 선택/초기화(기기 로컬 저장)
+function bindHeroCustomControls() {
+  const toggle = document.getElementById('hero-tool-toggle');
+  const menu = document.getElementById('hero-tool-menu');
+  const pick = document.getElementById('hero-pick');
+  const reset = document.getElementById('hero-reset');
+  const file = document.getElementById('hero-file');
+  if (toggle && menu) {
+    toggle.onclick = () => {
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+      menu.hidden = expanded;
+    };
+  }
+  if (pick && file) {
+    pick.onclick = () => file.click();
+    file.onchange = async () => {
+      const selected = file.files && file.files[0];
+      file.value = '';
+      if (!selected) return;
+      try {
+        await saveHeroBgFromFile(selected);
+        screenHome();
+      } catch (err) {
+        alert(err?.message || '배경 사진을 저장하지 못했습니다.');
+      }
+    };
+  }
+  if (reset) {
+    reset.onclick = () => {
+      clearHeroBg();
+      screenHome();
+    };
+  }
+}
+
 function screenHome(options = {}) {
   enterScreen('home', {}, { replace: true, ...options });
   if (!options.fromHistory) appHistoryDepth = 0;
@@ -688,15 +734,26 @@ function screenHome(options = {}) {
   const reportStatusBox = canSeeReportSummary()
     ? `<section class="sidebox restricted home-report-status-box" id="home-report-status">${reportSummaryPlaceholderHtml()}</section>`
     : '';
+  const customHero = hasCustomHero();
+  const heroImage = heroBgUrl();
   wideShell(`
     <div class="fsg-site has-bottomnav">
       ${siteTopHtml('home', { hideNav: true })}
       <section class="fsg-hero">
-        <div class="fsg-hero-visual" style="background-image:linear-gradient(90deg, rgba(255,255,255,.16), rgba(255,255,255,0) 38%, rgba(0,0,0,.08)), url('/field-service-hero-original.png')"></div>
+        <div class="fsg-hero-visual" style="background-image:linear-gradient(90deg, rgba(255,255,255,.16), rgba(255,255,255,0) 38%, rgba(0,0,0,.08)), url(&quot;${esc(heroImage)}&quot;)">
+          <div class="fsg-hero-tools">
+            <button class="fsg-hero-tool-toggle" id="hero-tool-toggle" type="button" aria-expanded="false" aria-controls="hero-tool-menu">배경</button>
+            <div class="fsg-hero-tool-menu" id="hero-tool-menu" hidden>
+              <button class="fsg-hero-edit" id="hero-pick" type="button">사진 선택</button>
+              ${customHero ? '<button class="fsg-hero-edit" id="hero-reset" type="button">기본 배경</button>' : ''}
+            </div>
+          </div>
+          <input id="hero-file" type="file" accept="image/*" hidden>
+        </div>
         <div class="fsg-hero-copy">
           <div class="fsg-group-strip">
             <span>${esc(congNameLabel())}</span>
-            <strong>${esc(state.name)}</strong>
+            <strong>${esc(displayGroupLabel(state.name))}</strong>
             <em>전체 ${groupEntries().length}개 집단 중 ${esc(currentGroupPosition() || '-')}번</em>
           </div>
           <h1>오늘의 봉사와 임명을 한눈에 확인하세요</h1>
@@ -714,13 +771,13 @@ function screenHome(options = {}) {
           <span class="home-chevron">${iconHtml('chevron')}</span>
         </button>
         <button class="home-card home-report ${open ? 'is-open' : 'is-closed'}" type="button" data-home-feature="report">
-          <span class="home-report-icon">${iconHtml('report')}</span>
+          <span class="home-report-icon">${iconImgHtml('report')}</span>
           <span class="home-report-text"><b>봉사 보고</b><em>${open ? '이번 달 봉사 보고 제출' : '보고 기간 안내'}</em></span>
           <span class="home-chevron">${iconHtml('chevron')}</span>
         </button>
         <h2 class="home-section-title">최근 안내</h2>
         <button class="home-card notice-card home-daily" id="go-daily-text" type="button">
-          <span class="notice-icon">${iconHtml('calendar')}</span>
+          <span class="notice-icon">${iconImgHtml('book')}</span>
           <span class="notice-divider"></span>
           <span class="notice-text"><em>${esc(dateLabel)}</em><b>오늘의 성구와 해설 보기</b></span>
           <span class="home-chevron">${iconHtml('chevron')}</span>
@@ -728,7 +785,7 @@ function screenHome(options = {}) {
         <h2 class="home-section-title">집단 공지</h2>
         <div class="notice-list">
           <button class="home-card notice-card" type="button" data-home-feature="assignment-meetings">
-            <span class="notice-icon">${iconHtml('notice')}</span>
+            <span class="notice-icon">${iconImgHtml('megaphone')}</span>
             <span class="notice-divider"></span>
             <span class="notice-text"><b>평일 집회 · 공개강연 임명</b><small>사회, 낭독, 기도, 프로그램 임명 확인</small></span>
             <span class="home-chevron">${iconHtml('chevron')}</span>
@@ -740,7 +797,7 @@ function screenHome(options = {}) {
             <span class="home-chevron">${iconHtml('chevron')}</span>
           </button>
           <button class="home-card notice-card" type="button" data-home-feature="assignment-group">
-            <span class="notice-icon">${iconHtml('people')}</span>
+            <span class="notice-icon">${iconImgHtml('people')}</span>
             <span class="notice-divider"></span>
             <span class="notice-text"><b>우리 집단 임명</b><small>집단별 청소 임명 확인</small></span>
             <span class="home-chevron">${iconHtml('chevron')}</span>
@@ -753,6 +810,7 @@ function screenHome(options = {}) {
   `);
   bindSiteTop(open);
   bindBottomNav(open);
+  bindHeroCustomControls();
   const dailyBtn = document.getElementById('go-daily-text');
   if (dailyBtn) dailyBtn.onclick = () => window.open(dailyTextUrl, '_blank', 'noopener,noreferrer');
   const nb = document.getElementById('new-notice');
@@ -1501,22 +1559,34 @@ async function openTalkNotice(n) {
   let talks = [];
   try { talks = await getTalks(); } catch {}
 
+  // 지난 계획 자동 숨김: 전월 1일 이전 강연은 표시하지 않음(기록은 유지)
+  const _cut = new Date(); _cut.setDate(1); _cut.setMonth(_cut.getMonth() - 1);
+  const cutoff = `${_cut.getFullYear()}-${String(_cut.getMonth() + 1).padStart(2, '0')}-01`;
+  talks = talks.filter((t) => String(t.date || '') >= cutoff);
+  let prevYear = null;
   const rows = talks.map((t) => {
-    const noMeeting = t.talkType === 'convention' || t.talkType === 'assembly'; // 회중 강연 없는 안내 행
+    const year = (String(t.date || '').match(/^(\d{4})/) || [])[1] || '';
+    const sep = (year && prevYear && year !== prevYear)
+      ? `<tr class="talk-year-sep"><td colspan="7">${esc(year)}년</td></tr>`
+      : '';
+    prevYear = year || prevYear;
+    // 회중 강연 없는 안내 행: 지역대회·순회대회·특별모임(event)
+    const noMeeting = t.talkType === 'convention' || t.talkType === 'assembly' || t.talkType === 'event';
     if (noMeeting) {
       const lbl = t.talkType === 'convention' ? '지역대회' : t.talkType === 'assembly' ? '순회대회' : '';
       const title = String(t.title || '');
       const body = (lbl && !title.startsWith(lbl))
         ? [lbl, title].filter(Boolean).join(' · ')
         : (title || lbl);
-      return `<tr class="talk-special">
+      const cls = t.talkType === 'event' ? 'talk-special talk-event' : 'talk-special';
+      return sep + `<tr class="${cls}">
         <td>${esc(talkDateMD(t.date))}</td>
         <td colspan="6">${esc(body)}</td>
       </tr>`;
     }
     if (t.talkType === 'circuit') {   // 순회 방문 주간: 낭독·기도 임명 없음
       const cap = ['순회 방문 주간', String(t.title || '')].filter(Boolean).join(' · ');
-      return `<tr class="talk-circuit">
+      return sep + `<tr class="talk-circuit">
         <td>${esc(talkDateMD(t.date))}</td>
         <td>${esc(t.speakerCong || '')}</td>
         <td>${esc(t.speakerName || '')}</td>
@@ -1526,7 +1596,8 @@ async function openTalkNotice(n) {
         <td></td>
       </tr>`;
     }
-    return `<tr>
+    const rowCls = t.talkType === 'special' ? 'talk-highlight' : ''; // 특별강연 강조
+    return sep + `<tr class="${rowCls}">
       <td>${esc(talkDateMD(t.date))}</td>
       <td>${esc(t.speakerCong || '')}</td>
       <td>${esc(t.speakerName || '')}</td>
@@ -1803,7 +1874,9 @@ async function openMidMeetingDetail(n) {
   }
   const monthOf = (w) => { const m = /(\d{1,2})월/.exec(w.date || ''); return m ? m[1] : ''; };
   const names = groupMemberNames();
-  const weeks = parseMidMeeting(n.body).filter((w) => monthActive(monthOf(w))); // 익월 말일 지난 월 자동 숨김
+  const weeks = parseMidMeeting(n.body)
+    .filter((w) => monthActive(monthOf(w))) // 익월 말일 지난 월 자동 숨김
+    .sort((a, b) => weekSortKey(a.date) - weekSortKey(b.date));
   const months = [...new Set(weeks.map(monthOf).filter(Boolean))];
   const nowMonth = String(new Date().getMonth() + 1);
   let selected = months.includes(nowMonth) ? nowMonth : (months[months.length - 1] || '');
@@ -1896,7 +1969,7 @@ function screenError(e) {
 function devPicker() {
   const links = groupEntries()
     .map((g) => `<a class="fsg-group-card" href="?g=${esc(g.key)}">
-      <span><b>${esc(g.name)}</b><em>집단 화면으로 이동</em></span><strong>${g.index + 1}</strong>
+      <span><b>${esc(g.label)}</b><em>집단 화면으로 이동</em></span><strong>${g.index + 1}</strong>
     </a>`).join('');
   wideShell(`
     <div class="fsg-site">
@@ -1937,8 +2010,24 @@ async function loadGroupNames() {
   } catch {}
 }
 
+// ---------- 설정 미완료 안내(설치 전 상태) ----------
+// dist/config.js 가 비어 있으면(압축만 풀고 설치 도우미를 안 돌린 상태) Firebase 없이 안내만 표시한다.
+function screenSetupRequired() {
+  shell(`
+    <section class="setup-required">
+      <h1>아직 설치 설정이 없습니다</h1>
+      <p class="lead">이 프로그램은 회중별 설정(Firebase·서버 주소)이 있어야 동작합니다.</p>
+      <ol>
+        <li>배포본 폴더에서 <b>설치.cmd</b>(Mac: <b>설치.command</b>)를 실행해 설치 도우미를 진행하세요.</li>
+        <li>설치가 끝나면 도우미가 <code>config.js</code>를 자동으로 채우고, 이 안내는 사라집니다.</li>
+      </ol>
+      <p class="muted">이미 설치했는데 이 화면이 보이면 <code>dist/config.js</code> 값이 비어 있는지 확인하세요. (설치 안내: 처음_설치_안내.pdf)</p>
+    </section>`);
+}
+
 // ---------- 부트 ----------
 async function boot() {
+  if (CONFIG_MISSING) return screenSetupRequired();
   const params = new URLSearchParams(location.search);
   const g = params.get('g');
   if (!g && params.get('admin') === '1') return openAdminLogin({ replace: true });
@@ -1967,9 +2056,12 @@ async function boot() {
   }
 }
 
-onAuthStateChanged(auth, async (user) => {
-  await refreshEditorSession(user);
-  refreshHomeReportStatusBox();
-});
+// 설정이 비어 auth 가 null 이면(설치 전) 구독하지 않음
+if (auth) {
+  onAuthStateChanged(auth, async (user) => {
+    await refreshEditorSession(user);
+    refreshHomeReportStatusBox();
+  });
+}
 
 boot();

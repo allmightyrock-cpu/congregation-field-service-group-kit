@@ -239,7 +239,55 @@ body {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.fsg-hero { border-bottom: 1px solid var(--fsg-line); background: #fff; }
+.fsg-hero { position: relative; border-bottom: 1px solid var(--fsg-line); background: #fff; }
+/* 홈 배경 사진 도구(우상단 '배경' 버튼 → 사진 선택/기본 배경) */
+.fsg-hero-tools {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 7px;
+}
+.fsg-hero-tool-toggle,
+.fsg-hero-edit {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid rgba(255,255,255,.55);
+  border-radius: 0;
+  background: rgba(34,34,34,.46);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: 0 2px 6px rgba(0,0,0,.18);
+  backdrop-filter: blur(4px);
+}
+.fsg-hero-tool-toggle {
+  min-width: 48px;
+  opacity: .72;
+}
+.fsg-hero-tool-toggle:hover,
+.fsg-hero-tool-toggle[aria-expanded="true"] { opacity: 1; background: rgba(34,34,34,.66); }
+.fsg-hero-tool-menu {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid rgba(255,255,255,.38);
+  background: rgba(255,255,255,.82);
+  box-shadow: 0 4px 12px rgba(0,0,0,.16);
+  backdrop-filter: blur(6px);
+}
+.fsg-hero-tool-menu[hidden] { display: none; }
+.fsg-hero-tool-menu .fsg-hero-edit {
+  border-color: rgba(74,112,176,.28);
+  background: #fff;
+  color: var(--accent);
+  box-shadow: none;
+}
+.fsg-hero-tool-toggle:active,
+.fsg-hero-edit:active { transform: translateY(1px); }
 .fsg-hero-visual {
   min-height: 260px;
   background-position: center;
@@ -2578,7 +2626,11 @@ h2.sec { font-size: 16px; color: #66788a; margin: 26px 0 10px; }
   white-space: nowrap;            /* 연제 줄바꿈 방지 */
   padding-left: 6px; padding-right: 6px;
 }
-.talk-table tr.talk-special td { color: #1a4bb8; font-weight: 700; }
+/* 중요 행사 강조: 대회·순회방문·특별강연 = 파랑 배경 / 특별모임 = 앰버 배경 */
+.talk-table tr.talk-special td,
+.talk-table tr.talk-circuit td,
+.talk-table tr.talk-highlight td { background: #eaf2ff; color: #1a3ea8; font-weight: 700; }
+.talk-table tr.talk-event td { background: #fff3e0; color: #9a5b00; font-weight: 800; }
 .talk-table td.tt-empty { color: #888; padding: 18px; }
 
 /* 일자 열고정: 모바일 가로 스크롤 시 날짜가 항상 보이도록(임명 확인 편의) */
@@ -2594,7 +2646,23 @@ h2.sec { font-size: 16px; color: #66788a; margin: 26px 0 10px; }
   z-index: 3;
   background: #eef1f6;                              /* 헤더 배경 유지 */
 }
-.talk-table tr.talk-special td:nth-child(1) { background: #fff; }
+/* 고정된 일자 칸도 행 강조색과 동일하게(흰 배경으로 덮이지 않도록) */
+.talk-table tr.talk-special td:nth-child(1),
+.talk-table tr.talk-circuit td:nth-child(1),
+.talk-table tr.talk-highlight td:nth-child(1) { background: #eaf2ff; }
+.talk-table tr.talk-event td:nth-child(1) { background: #fff3e0; }
+/* 연도 구분선 행 */
+.talk-table tr.talk-year-sep td {
+  position: static;
+  background: #dfe7f5;
+  color: #1a4bb8;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: 1px;
+  border-top: 2px solid #1a4bb8;
+  box-shadow: none;
+  padding: 5px 6px;
+}
 
 @media (prefers-color-scheme: dark) {
   .talk-sheet { background: #fff; color: #111; } /* 인쇄물처럼 항상 흰 종이 */
@@ -3222,4 +3290,13 @@ h2.sec { font-size: 16px; color: #66788a; margin: 26px 0 10px; }
   .home-report-text b { font-size: 20px; }
   .fsg-home .notice-card { grid-template-columns: 52px 1px 1fr 26px; gap: 14px; padding: 16px 14px; }
   .fsg-home .notice-text b { font-size: 16px; }
+}
+
+/* 디자이너 제공 라인아트 아이콘: PNG 알파를 마스크로 써서 currentColor 단색 렌더(카드 색에 맞게 흰/파랑) */
+.fsg-imgicon {
+  display: block; width: 100%; height: 100%;
+  background-color: currentColor;
+  -webkit-mask: var(--i) center / contain no-repeat;
+  mask: var(--i) center / contain no-repeat;
+  -webkit-mask-mode: alpha; mask-mode: alpha;
 }

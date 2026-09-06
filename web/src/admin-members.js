@@ -71,6 +71,16 @@ export function buildMemberPrivatePayload(note, uid, timestamp) {
   };
 }
 
+// 집단 표시명 통일: "○○ 야외 봉사 집단" / "○○ 집단" / "○○" → "○○ 집단"
+export function displayGroupLabel(name) {
+  const base = String(name || '')
+    .replace(/\s*야외\s*봉사\s*집단\s*$/u, '')
+    .replace(/\s*야외봉사\s*집단\s*$/u, '')
+    .replace(/\s*집단\s*$/u, '')
+    .trim();
+  return base ? `${base} 집단` : '집단';
+}
+
 export function buildRosterColumns(groups = {}, membersByGroup = {}, groupOrder = GROUP_ORDER) {
   return groupOrder.map((groupKey) => {
     const group = groups[groupKey] || {};
@@ -85,7 +95,7 @@ export function buildRosterColumns(groups = {}, membersByGroup = {}, groupOrder 
     }
     return {
       groupKey,
-      label: group.label || group.name || groupKey,
+      label: displayGroupLabel(group.label || group.name || groupKey),
       rows
     };
   });

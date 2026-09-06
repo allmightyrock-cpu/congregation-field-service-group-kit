@@ -1,5 +1,5 @@
 node_modules/
-dist/
+# web/dist 는 빌드 완료본을 배포본에 동봉하므로 무시하지 않음(설치 PC에서 빌드 불필요)
 web/tests/
 .wrangler/
 .env
