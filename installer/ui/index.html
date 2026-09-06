@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>야외 봉사 집단 설치 도우미</title>
+<link rel="stylesheet" href="/ui/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div class="brand"><span class="brand-mark">FSG</span><span class="brand-text">야외 봉사 집단 설치 도우미</span></div>
+    <div class="top-right"><span id="conn" class="conn">연결 중…</span></div>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="rail" id="rail" aria-label="설치 단계"></nav>
+  <main class="main">
+    <div id="resume-banner" class="banner" hidden></div>
+    <section class="card" id="screen" aria-live="polite"></section>
+    <footer class="foot">
+      <div class="foot-left"><button type="button" class="btn ghost" id="btn-prev">이전</button></div>
+      <div class="foot-right">
+        <span id="next-hint" class="hint"></span>
+        <button type="button" class="btn" id="btn-next">다음</button>
+      </div>
+    </footer>
+    <details class="logbox" id="logbox">
+      <summary>자세한 기록 <span class="muted" id="log-count"></span> <button type="button" class="btn tiny ghost" id="btn-copylog">기록 복사</button></summary>
+      <pre id="log"></pre>
+    </details>
+    <div id="devpanel" class="devpanel" hidden></div>
+  </main>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<script src="/ui/app.js"></script>
+</body>
+</html>

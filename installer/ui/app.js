@@ -1,0 +1,445 @@
+/* 설치 도우미 화면 — 서버 상태(SSE)를 그대로 그린다. 판단(다음 가능 여부)은 서버가 한다. */
+(() => {
+  const $ = (s, el = document) => el.querySelector(s);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  const STEPS = [
+    { id: 'precheck', label: '사전 점검' },
+    { id: 'start', label: '시작' },
+    { id: 'cong', label: '회중 정보' },
+    { id: 'google', label: 'Google 로그인' },
+    { id: 'auth', label: '로그인 기능 켜기' },
+    { id: 'sakey', label: '서버 키 등록' },
+    { id: 'cloudflare', label: 'Cloudflare 로그인' },
+    { id: 'confirm', label: '확인' },
+    { id: 'install', label: '설치 진행' },
+    { id: 'done', label: '완료' }
+  ];
+
+  let S = null;          // 서버 publicState
+  let job = null;        // 현재 작업
+  let lastAction = null; // 다시 시도용 {name, body}
+  let localErr = null;   // 즉시 작업 실패 표시용
+  const logs = [];
+
+  // ---------- 통신 ----------
+  async function api(path, body) {
+    const r = await fetch('/api/' + path, {
+      method: body === undefined ? 'GET' : 'POST',
+      headers: body === undefined ? {} : { 'Content-Type': 'application/json', 'X-FSG-Installer': '1' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      cache: 'no-store'
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok && data.error) throw data.error;
+    if (!r.ok) throw { code: 'HTTP_' + r.status, message: '요청이 실패했어요.' };
+    return data;
+  }
+  async function act(name, body = {}, { remember = true } = {}) {
+    if (remember) lastAction = { name, body };
+    localErr = null;
+    try {
+      const res = await api('action/' + name, body);
+      if (res.job) { job = res.job; render(); }
+      return res;
+    } catch (e) {
+      localErr = e; render();
+      throw e;
+    }
+  }
+  function connectEvents() {
+    const es = new EventSource('/api/events');
+    es.onopen = () => setConn(true);
+    es.onerror = () => setConn(false);
+    es.addEventListener('state', (ev) => { S = JSON.parse(ev.data); job = S.job || job; render(); });
+    es.addEventListener('job', (ev) => { job = JSON.parse(ev.data); render(); });
+    es.addEventListener('log', (ev) => { const e = JSON.parse(ev.data); logs.push(e); if (logs.length > 600) logs.shift(); renderLog(); });
+  }
+  function setConn(on) { const c = $('#conn'); c.textContent = on ? '연결됨' : '연결 끊김 — 설치 창(검은 창)이 닫혔는지 확인하세요'; c.className = 'conn ' + (on ? 'on' : 'off'); }
+
+  // ---------- 그리기 ----------
+  function cur() { return S ? S.state.currentStep : 0; }
+  function curId() { return STEPS[cur()].id; }
+
+  function render() {
+    if (!S) return;
+    renderRail(); renderBanner(); renderScreen(); renderFoot(); renderDev();
+  }
+
+  function renderRail() {
+    const unlocked = S.unlocked;
+    $('#rail').innerHTML = STEPS.map((st, i) => {
+      const cls = i === cur() ? 'current' : i < cur() ? 'done' : (i <= unlocked ? 'unlocked' : 'locked');
+      const mark = cls === 'done' ? '✓' : String(i);
+      return `<button type="button" class="step ${cls}" data-step="${i}" ${cls === 'locked' ? 'disabled' : ''}><span class="num">${mark}</span><span class="lbl">${esc(st.label)}</span></button>`;
+    }).join('');
+    $('#rail').querySelectorAll('.step:not([disabled])').forEach((b) => b.onclick = () => nav(+b.dataset.step));
+  }
+
+  function renderBanner() {
+    const b = $('#resume-banner');
+    if (S.resumed && cur() > 0 && !sessionStorage.getItem('fsg.resume.seen')) {
+      const t = new Date(S.state.updatedAt);
+      b.hidden = false;
+      b.innerHTML = `<span>이전에 진행하던 설치를 이어갑니다. (마지막 저장 ${esc(t.toLocaleString('ko-KR'))})</span>
+        <span><button type="button" class="btn tiny ghost" id="b-restart">처음부터 다시</button><button type="button" class="btn tiny ghost" id="b-dismiss">닫기</button></span>`;
+      $('#b-dismiss').onclick = () => { sessionStorage.setItem('fsg.resume.seen', '1'); b.hidden = true; };
+      $('#b-restart').onclick = resetAll;
+    } else b.hidden = true;
+  }
+
+  async function resetAll() {
+    if (!confirm('지금까지 저장한 설치 정보를 지우고 처음부터 다시 시작할까요?\n(이미 만들어진 Firebase/Cloudflare 자원은 지워지지 않습니다.)')) return;
+    await act('reset', {}, { remember: false });
+    sessionStorage.removeItem('fsg.resume.seen');
+    toast('처음부터 다시 시작합니다.');
+  }
+
+  async function nav(step) {
+    try { await api('nav', { step }); } catch (e) { toast(e.message || '이동할 수 없어요.'); }
+  }
+
+  function renderFoot() {
+    const i = cur(); const id = curId();
+    const prev = $('#btn-prev'), next = $('#btn-next'), hint = $('#next-hint');
+    prev.disabled = i === 0;
+    prev.onclick = () => nav(i - 1);
+    const busy = job && job.status === 'running';
+    const custom = { start: '시작', confirm: '설치 시작', done: '' }[id];
+    if (id === 'done') { next.hidden = true; hint.textContent = ''; return; }
+    next.hidden = false;
+    next.textContent = custom || '다음';
+    if (id === 'confirm') {
+      next.disabled = busy || !(S.gates.cloudflare && S.gates.sakey && S.gates.auth && S.gates.google && S.gates.cong);
+      next.onclick = () => startInstall();
+      hint.textContent = '';
+      return;
+    }
+    const can = S.gates[id] && !busy;
+    next.disabled = !can;
+    next.onclick = () => nav(i + 1);
+    hint.textContent = can ? '' : ({
+      precheck: '모든 점검 항목이 초록색이어야 다음으로 갈 수 있어요.',
+      cong: '회중 이름·영문 이름·집단 이름을 채우고 [저장]을 누르세요.',
+      google: 'Google 로그인과 프로젝트 준비가 끝나야 해요.',
+      auth: '로그인 기능이 켜진 것을 확인해야 해요.',
+      sakey: '서버 키 파일을 등록해야 해요.',
+      cloudflare: 'Cloudflare 로그인이 필요해요.',
+      install: '설치가 끝나면 자동으로 넘어갑니다.'
+    }[id] || '');
+  }
+
+  function renderScreen() {
+    const id = curId();
+    const el = $('#screen');
+    const fn = SCREENS[id];
+    el.innerHTML = fn.html();
+    if (fn.bind) fn.bind(el);
+    // 공통: 오류 카드
+    const errHost = $('#err-host', el);
+    if (errHost) errHost.innerHTML = errorCardHtml(id);
+    bindErrorActions(el);
+  }
+
+  function currentError(id) {
+    if (localErr) return localErr;
+    if (job && job.status === 'error' && jobBelongsTo(job.name, id)) return job.error;
+    return null;
+  }
+  function jobBelongsTo(name, id) {
+    const map = { precheck: /^precheck\./, google: /^google\./, auth: /^auth\./, sakey: /^sakey\./, cloudflare: /^cf\./, confirm: /^(install\.|demo\.job)/, install: /^(install\.|demo\.job)/ };
+    return map[id] ? map[id].test(name) : false;
+  }
+  function errorCardHtml(id) {
+    const e = currentError(id);
+    if (!e) return '';
+    const btns = (Array.isArray(e.actions) ? e.actions : [{ id: 'retry', label: '다시 시도' }])
+      .map((a) => `<button type="button" class="btn ghost" data-erract="${esc(a.id)}">${esc(a.label)}</button>`).join('');
+    return `<div class="errcard"><b>${esc(e.message)}</b>${e.hint ? `<div class="hint">${esc(e.hint)}</div>` : ''}
+      <div class="btnrow">${btns}<button type="button" class="btn ghost" data-erract="copylog">기록 복사</button></div></div>`;
+  }
+  function bindErrorActions(el) {
+    el.querySelectorAll('[data-erract]').forEach((b) => b.onclick = async () => {
+      const a = b.dataset.erract;
+      if (a === 'copylog') return copyLog();
+      if (a === 'retry' || a === 'relogin' || a === 'suffix' || a === 'rename') {
+        if (!lastAction) return;
+        try { await act(lastAction.name, { ...lastAction.body, choice: a }); } catch {}
+      }
+    });
+  }
+
+  function jobListHtml(steps) {
+    if (!steps || !steps.length) return '';
+    return `<ul class="checklist">${steps.map((s) => `<li><span class="mark ${s.status}">${s.status === 'ok' ? '✓' : s.status === 'error' ? '!' : ''}</span><span><span class="lbl">${esc(s.label)}</span>${s.detail ? `<div class="detail">${esc(s.detail)}</div>` : ''}</span></li>`).join('')}</ul>`;
+  }
+
+  // ---------- 화면들 ----------
+  const SCREENS = {
+    precheck: {
+      html() {
+        const pc = S.state.precheck || {};
+        const running = job && job.name === 'precheck.run' && job.status === 'running';
+        const items = pc.items || [];
+        return `<h1>사전 점검</h1><p class="lead">설치에 필요한 인터넷 연결과 파일, 도구를 확인합니다. 모두 초록색이면 [다음]이 켜집니다.</p>
+          ${running ? jobListHtml(job.steps) : items.length ? `<ul class="checklist">${items.map((i) => `<li><span class="mark ${i.ok ? 'ok' : 'error'}">${i.ok ? '✓' : '!'}</span><span><span class="lbl">${esc(i.label)}</span><div class="detail">${esc(i.detail)}</div>${!i.ok && i.fix ? `<div class="fix">${esc(i.fix)}</div>` : ''}</span></li>`).join('')}</ul>` : '<p class="muted">아직 점검하지 않았습니다.</p>'}
+          <div id="err-host"></div>
+          <div class="btnrow"><button type="button" class="btn ${items.length ? 'ghost' : ''}" id="b-precheck" ${running ? 'disabled' : ''}>${items.length ? '다시 점검' : '점검 시작'}</button></div>
+          ${pc.at ? `<p class="muted">마지막 점검: ${esc(new Date(pc.at).toLocaleString('ko-KR'))}</p>` : ''}`;
+      },
+      bind(el) {
+        $('#b-precheck', el).onclick = () => act('precheck.run').catch(() => {});
+        if (!(S.state.precheck && S.state.precheck.items && S.state.precheck.items.length) && !(job && job.name === 'precheck.run')) act('precheck.run').catch(() => {});
+      }
+    },
+
+    start: {
+      html() {
+        return `<h1>시작하기</h1>
+          <p class="lead">이 도우미는 회중 전용 <b>야외 봉사 집단 앱</b>을 인터넷에 설치합니다. 집단 성원은 설치가 끝난 뒤 주소 하나로 접속해 봉사 보고, 임명, 광고를 볼 수 있습니다.</p>
+          <h2>걸리는 시간</h2><p>보통 10~15분. 중간에 멈춰도 다음에 이 도우미를 다시 열면 이어서 진행됩니다.</p>
+          <h2>미리 준비할 것 두 가지</h2>
+          <ul class="clean">
+            <li><b>Google 계정</b> — 데이터를 저장할 Firebase에 씁니다. 회중 공용 계정을 권장합니다. 없으면 <a href="#" data-open="https://accounts.google.com/signup">Google 계정 만들기</a></li>
+            <li><b>Cloudflare 계정</b> — 앱을 인터넷에 올리는 데 씁니다(무료). 없으면 <a href="#" data-open="https://dash.cloudflare.com/sign-up">Cloudflare 가입</a></li>
+          </ul>
+          <h2>도우미가 대신 해 주는 일</h2>
+          <ul class="clean"><li>Firebase 프로젝트·데이터 저장소 만들기와 설정값 받아오기</li><li>서버와 웹 사이트 배포, 서버 비밀 키 저장</li><li>집단·역할 초기 데이터 등록과 접속 주소 확인</li></ul>
+          <p class="muted">직접 입력하는 것은 회중 이름과 집단 이름뿐입니다. 로그인은 브라우저에서 평소처럼 하면 됩니다.</p>`;
+      },
+      bind(el) { bindOpenLinks(el); }
+    },
+
+    cong: {
+      html() {
+        const c = S.state.cong || {};
+        const groups = c.groups && c.groups.length ? c.groups : [];
+        return `<h1>회중 정보</h1><p class="lead">회중 이름과 집단 수를 정합니다. 집단 이름은 자동으로 채워지며 나중에 앱에서도 바꿀 수 있습니다.</p>
+          <div class="field"><label for="f-name">회중 이름</label><input type="text" id="f-name" value="${esc(c.name)}" placeholder="예: 동두천 남부" autocomplete="off"><div class="help">앱 화면과 문서에 표시됩니다. "회중"은 빼고 적어도 됩니다.</div><div class="err" id="e-name"></div></div>
+          <div class="field"><label for="f-slug">영문 이름 (인터넷 주소용)</label><input type="text" id="f-slug" value="${esc(c.slug)}" placeholder="자동 제안" autocomplete="off" spellcheck="false"><div class="help" id="h-slug">영문 소문자·숫자·하이픈, 4~22자. 이 이름으로 접속 주소가 정해집니다.</div><div class="err" id="e-slug"></div></div>
+          <div class="field"><label for="f-count">집단 수</label><input type="number" id="f-count" min="1" max="12" value="${esc(c.groupCount || 3)}" style="max-width:120px"><div class="err" id="e-count"></div></div>
+          <div class="field"><label>집단 이름</label><div class="groups" id="f-groups">${groups.map((g, i) => `<input type="text" data-i="${i}" value="${esc(g.name)}">`).join('')}</div><div class="err" id="e-groups"></div></div>
+          <h2>만들어질 이름 미리보기</h2>
+          <table class="kv"><tbody>
+            <tr><th>접속 주소(예정)</th><td><code id="p-site">-</code></td></tr>
+            <tr><th>Firebase 프로젝트</th><td><code id="p-project">-</code></td></tr>
+            <tr><th>서버(Worker)</th><td><code id="p-worker">-</code></td></tr>
+          </tbody></table>
+          <p class="muted">이름이 이미 사용 중이면 다음 단계에서 자동으로 "-2"를 붙여 제안합니다.</p>
+          <div id="err-host"></div>
+          <div class="btnrow"><button type="button" class="btn" id="b-save">저장</button><span class="muted" id="s-saved">${S.gates.cong ? '저장됨 — [다음]을 누르세요.' : ''}</span></div>`;
+      },
+      bind(el) {
+        const name = $('#f-name', el), slug = $('#f-slug', el), count = $('#f-count', el), groupsEl = $('#f-groups', el);
+        let slugTouched = !!(S.state.cong && S.state.cong.slug);
+        const preview = () => {
+          const s = slug.value.trim().toLowerCase();
+          $('#p-site', el).textContent = s ? `https://${s}-fsg.pages.dev` : '-';
+          $('#p-project', el).textContent = s ? `${s}-fsg` : '-';
+          $('#p-worker', el).textContent = s ? `${s}-fsg-api` : '-';
+        };
+        const rebuildGroups = () => {
+          const n = Math.max(1, Math.min(12, parseInt(count.value, 10) || 1));
+          const existing = [...groupsEl.querySelectorAll('input')].map((i) => i.value);
+          groupsEl.innerHTML = Array.from({ length: n }, (_, i) => `<input type="text" data-i="${i}" value="${esc(existing[i] ?? `${i + 1}집단`)}">`).join('');
+        };
+        let t;
+        name.oninput = () => {
+          clearTimeout(t);
+          t = setTimeout(async () => {
+            if (slugTouched) return;
+            try { const r = await api('action/cong.suggest', { name: name.value, groupCount: count.value }); slug.value = r.slug; preview(); } catch {}
+          }, 250);
+        };
+        slug.oninput = () => { slugTouched = slug.value.trim().length > 0; preview(); };
+        count.onchange = rebuildGroups;
+        if (!groupsEl.children.length) rebuildGroups();
+        preview();
+        $('#b-save', el).onclick = async () => {
+          ['name', 'slug', 'count', 'groups'].forEach((k) => $('#e-' + k, el).textContent = '');
+          const groups = [...groupsEl.querySelectorAll('input')].map((i) => ({ name: i.value }));
+          try {
+            const r = await act('cong.save', { name: name.value, slug: slug.value, groupCount: count.value, groups }, { remember: false });
+            if (!r.ok) { for (const [k, v] of Object.entries(r.errors)) { const m = { name: 'name', slug: 'slug', groupCount: 'count', groups: 'groups' }[k]; if (m) $('#e-' + m, el).textContent = v; } return; }
+            toast('저장했습니다.');
+          } catch (e) { toast(e.message || '저장 실패'); }
+        };
+      }
+    },
+
+    google: {
+      html() {
+        const fb = S.state.firebase || {};
+        const running = job && /^google\./.test(job.name) && job.status === 'running';
+        return `<h1>Google 로그인과 Firebase 준비</h1><p class="lead">[Google로 로그인]을 누르면 브라우저 창이 열립니다. 회중용 Google 계정으로 로그인하고 허용을 누른 뒤 이 화면으로 돌아오세요.</p>
+          <ul class="clean"><li>로그인이 끝나면 도우미가 Firebase 프로젝트를 새로 만들고(권장) 데이터 저장소와 웹 앱을 등록합니다.</li><li>설정값 6개는 자동으로 받아옵니다. 복사해 붙여 넣을 것이 없습니다.</li></ul>
+          ${fb.projectId && fb.config ? `<div class="okcard">받아왔습니다 ✓ — 프로젝트 <code>${esc(fb.projectId)}</code></div>` : ''}
+          ${running ? jobListHtml(job.steps) : ''}
+          <div id="err-host"></div>
+          <div class="btnrow"><button type="button" class="btn big" id="b-glogin" ${running ? 'disabled' : ''}>Google로 로그인</button></div>
+          <p class="muted">로그인 창이 안 열리면 검은 창(설치 창)에 표시된 주소를 브라우저에 직접 붙여 넣으세요.</p>`;
+      },
+      bind(el) { $('#b-glogin', el).onclick = () => act('google.login').catch(() => {}); }
+    },
+
+    auth: {
+      html() {
+        const fb = S.state.firebase || {};
+        const running = job && /^auth\./.test(job.name) && job.status === 'running';
+        return `<h1>로그인 기능 켜기</h1><p class="lead">Firebase의 로그인 기능(Authentication)은 콘솔에서 한 번 '시작하기'를 눌러야 켜집니다. 이 한 번의 클릭만 직접 해 주세요.</p>
+          <ol><li>[페이지 열기]를 누르면 해당 페이지가 열립니다.</li><li>페이지에서 <b>시작하기</b>를 누릅니다. 로그인 방법을 고르라고 하면 <b>익명</b>을 켜고 저장합니다.</li><li>돌아와서 [확인]을 누르면 켜졌는지 검사합니다.</li></ol>
+          ${fb.authEnabled ? '<div class="okcard">로그인 기능이 켜져 있습니다 ✓</div>' : ''}
+          ${running ? jobListHtml(job.steps) : ''}
+          <div id="err-host"></div>
+          <div class="btnrow"><button type="button" class="btn ghost" id="b-aopen">페이지 열기</button><button type="button" class="btn" id="b-averify" ${running ? 'disabled' : ''}>확인</button></div>`;
+      },
+      bind(el) { $('#b-aopen', el).onclick = () => act('auth.open', {}, { remember: false }).catch(() => {}); $('#b-averify', el).onclick = () => act('auth.verify').catch(() => {}); }
+    },
+
+    sakey: {
+      html() {
+        const fb = S.state.firebase || {};
+        return `<h1>서버 키 등록</h1><p class="lead">서버가 데이터에 접근하려면 "서비스 계정 키" 파일이 필요합니다. 페이지에서 키를 하나 만들어 내려받으면 도우미가 다운로드 폴더에서 자동으로 찾습니다.</p>
+          <ol><li>[키 만들기 페이지 열기] → 페이지에서 <b>새 비공개 키 생성</b> → <b>키 생성</b>. 파일이 다운로드됩니다.</li><li>돌아와서 [다운로드 폴더에서 찾기]를 누릅니다. 방금 받은 파일을 자동으로 제안합니다.</li></ol>
+          ${fb.saKeyPath ? `<div class="okcard">키 등록됨 ✓ — <code>${esc(fb.saKeyPath)}</code></div>` : ''}
+          <div id="sa-cands"></div>
+          <div id="err-host"></div>
+          <div class="btnrow"><button type="button" class="btn ghost" id="b-sopen">키 만들기 페이지 열기</button><button type="button" class="btn" id="b-sscan">다운로드 폴더에서 찾기</button></div>
+          <p class="muted">키 파일은 이 PC의 배포본 폴더 안 <code>.secrets</code>에만 복사되고, 서버에 비밀값으로 저장하는 것 외에는 어디에도 보내지 않습니다. 키 파일을 다른 사람에게 보내지 마세요.</p>`;
+      },
+      bind(el) { $('#b-sopen', el).onclick = () => act('sakey.open', {}, { remember: false }).catch(() => {}); $('#b-sscan', el).onclick = () => act('sakey.scan').catch(() => {}); }
+    },
+
+    cloudflare: {
+      html() {
+        const cf = S.state.cloudflare || {};
+        const running = job && /^cf\./.test(job.name) && job.status === 'running';
+        return `<h1>Cloudflare 로그인</h1><p class="lead">[Cloudflare로 로그인]을 누르면 브라우저가 열립니다. 로그인 후 <b>Allow</b>를 누르고 돌아오세요. 앱은 이 계정의 무료 요금제에 올라갑니다.</p>
+          <table class="kv"><tbody>
+            <tr><th>서버(Worker) 이름</th><td><code>${esc(cf.workerName || '-')}</code></td></tr>
+            <tr><th>웹 사이트 프로젝트</th><td><code>${esc(cf.pagesProject || '-')}</code> → <code>https://${esc(cf.pagesProject || '…')}.pages.dev</code></td></tr>
+          </tbody></table>
+          ${cf.loggedIn ? `<div class="okcard">로그인됨 ✓ ${cf.accountName ? '— ' + esc(cf.accountName) : ''}</div>` : ''}
+          ${running ? jobListHtml(job.steps) : ''}
+          <div id="err-host"></div>
+          <div class="btnrow"><button type="button" class="btn big" id="b-cflogin" ${running ? 'disabled' : ''}>Cloudflare로 로그인</button></div>`;
+      },
+      bind(el) { $('#b-cflogin', el).onclick = () => act('cf.login').catch(() => {}); }
+    },
+
+    confirm: {
+      html() {
+        const c = S.state.cong, fb = S.state.firebase, cf = S.state.cloudflare;
+        return `<h1>확인</h1><p class="lead">아래 내용으로 설치합니다. [설치 시작]을 누르면 되돌릴 수 없는 작업(프로젝트 배포)이 시작됩니다.</p>
+          <table class="kv"><tbody>
+            <tr><th>회중</th><td>${esc(c.name)} <span class="muted">(${esc(c.slug)})</span></td></tr>
+            <tr><th>집단 ${c.groups.length}개</th><td>${c.groups.map((g) => esc(g.name)).join(', ')}</td></tr>
+            <tr><th>Firebase 프로젝트</th><td><code>${esc(fb.projectId)}</code></td></tr>
+            <tr><th>서버 키</th><td><code>${esc(fb.saKeyPath)}</code></td></tr>
+            <tr><th>Cloudflare</th><td>${esc(cf.accountName || '로그인됨')} · 서버 <code>${esc(cf.workerName)}</code> · 사이트 <code>${esc(cf.pagesProject)}</code></td></tr>
+            <tr><th>기본 PIN</th><td>집단 감독자·역할별 기본 PIN은 완료 화면에 표시됩니다. 첫 로그인 후 꼭 바꾸세요.</td></tr>
+          </tbody></table>
+          <div id="err-host"></div>
+          <p class="muted">진행 중에는 창을 닫지 마세요. 3~5분 걸립니다.</p>`;
+      }
+    },
+
+    install: {
+      html() {
+        const j = job && /^(install\.|demo\.job)/.test(job.name) ? job : null;
+        const st = S.state.install || {};
+        const steps = j ? j.steps : [];
+        return `<h1>설치 진행</h1><p class="lead">${st.status === 'ok' ? '설치가 끝났습니다.' : j && j.status === 'running' ? '설치 중입니다. 창을 닫지 마세요.' : j && j.status === 'error' ? '설치가 중단되었습니다. 원인을 확인하고 다시 시도하세요.' : '설치를 시작하지 않았습니다.'}</p>
+          ${jobListHtml(steps)}
+          <div id="err-host"></div>
+          ${st.status === 'ok' ? '<div class="okcard">모든 단계가 끝났습니다 ✓ 잠시 후 완료 화면으로 넘어갑니다.</div>' : ''}
+          ${!j || j.status !== 'running' ? `<div class="btnrow">${st.status !== 'ok' ? '<button type="button" class="btn" id="b-install">' + (j ? '다시 시도' : '설치 시작') + '</button>' : ''}</div>` : ''}`;
+      },
+      bind(el) {
+        const b = $('#b-install', el); if (b) b.onclick = () => startInstall();
+        if ((S.state.install || {}).status === 'ok') setTimeout(() => { if (cur() === 8) nav(9); }, 1200);
+      }
+    },
+
+    done: {
+      html() {
+        const r = S.state.result || {}; const c = S.state.cong || {};
+        return `<h1>설치 완료</h1><p class="lead">${esc(c.name)} 야외 봉사 집단 앱이 준비되었습니다. 아래 주소를 성원에게 공유하세요.</p>
+          <div class="bigurl">${esc(r.siteUrl || '(주소 확인 중)')}</div>
+          <div class="btnrow"><button type="button" class="btn big" id="b-open-site" ${r.siteUrl ? '' : 'disabled'}>지금 열기</button><button type="button" class="btn ghost" id="b-save-result">결과 파일 저장</button></div>
+          <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+            <div class="qr" id="qr">QR (완료 화면 단계에서 추가)</div>
+            <div style="flex:1;min-width:260px">
+              <h2>기본 PIN</h2>
+              <table class="kv"><tbody>${(r.pins || []).map((p) => `<tr><th>${esc(p.group)} · ${esc(p.role)}</th><td><code>${esc(p.pin)}</code></td></tr>`).join('') || '<tr><td class="muted">표시할 PIN이 없습니다.</td></tr>'}</tbody></table>
+            </div>
+          </div>
+          <h2>다음에 할 일 세 가지</h2>
+          <ol><li>감독자로 로그인해 <b>PIN을 바꾸세요</b>.</li><li>편집자 화면에서 <b>집단 성원을 입력</b>하세요.</li><li>성원에게 <b>접속 주소</b>를 안내하세요. 휴대폰에서는 "홈 화면에 추가"로 앱처럼 쓸 수 있습니다.</li></ol>
+          <p class="muted">서버 키 파일(.secrets 폴더)은 이 PC 밖으로 보내지 마세요. 이 도우미는 이제 닫아도 됩니다.</p>
+          <div class="btnrow"><button type="button" class="btn ghost" id="b-quit">도우미 닫기</button></div>`;
+      },
+      bind(el) {
+        const r = S.state.result || {};
+        const o = $('#b-open-site', el); if (o) o.onclick = () => act('open', { url: r.siteUrl }, { remember: false }).catch((e) => toast(e.message));
+        $('#b-save-result', el).onclick = () => toast('결과 파일 저장은 완료 화면 단계에서 연결됩니다.');
+        $('#b-quit', el).onclick = quit;
+      }
+    }
+  };
+
+  async function startInstall() {
+    try { await act('install.run'); if (cur() !== 8) nav(8); } catch {}
+  }
+
+  function bindOpenLinks(el) {
+    el.querySelectorAll('[data-open]').forEach((a) => a.onclick = (ev) => { ev.preventDefault(); act('open', { url: a.dataset.open }, { remember: false }).catch((e) => toast(e.message)); });
+  }
+
+  async function quit() {
+    if (!confirm('설치 도우미를 닫을까요?')) return;
+    try { await api('quit', {}); } catch {}
+    document.body.innerHTML = '<main class="layout" style="display:block"><section class="card"><h1>설치 도우미를 닫았습니다.</h1><p>이 탭은 닫아도 됩니다. 다시 열려면 배포본 폴더의 설치 파일을 실행하세요.</p></section></main>';
+  }
+
+  // ---------- 기록 ----------
+  function renderLog() {
+    const pre = $('#log');
+    pre.innerHTML = logs.map((e) => `<span class="${e.level}">${esc(e.t.slice(11, 19))} ${esc(e.text)}</span>`).join('\n');
+    $('#log-count').textContent = `(${logs.length}줄)`;
+    if ($('#logbox').open) pre.scrollTop = pre.scrollHeight;
+  }
+  async function copyLog() {
+    try {
+      const r = await fetch('/api/log', { cache: 'no-store' }); const text = await r.text();
+      await navigator.clipboard.writeText(text);
+      toast('기록을 복사했습니다. 메신저나 메일에 붙여 넣으세요.');
+    } catch { toast('복사하지 못했어요. 기록 파일을 직접 여세요: ' + (S && S.meta.logFile)); }
+  }
+  $('#btn-copylog').onclick = (ev) => { ev.preventDefault(); copyLog(); };
+
+  // ---------- 개발 패널 ----------
+  function renderDev() {
+    const d = $('#devpanel');
+    if (!S.dev) { d.hidden = true; return; }
+    d.hidden = false;
+    d.innerHTML = `<b>개발 확인용</b> (FSG_DEV=1 일 때만 보임) — <button type="button" class="btn tiny ghost" data-dev="unlock">3~6단계 통과 처리</button> <button type="button" class="btn tiny ghost" data-dev="installing">설치 중 상태</button> <button type="button" class="btn tiny ghost" data-dev="job">가짜 설치 실행</button> <button type="button" class="btn tiny ghost" data-dev="jobfail">가짜 설치(실패)</button> <button type="button" class="btn tiny ghost" data-dev="reset">상태 초기화</button>`;
+    d.querySelectorAll('[data-dev]').forEach((b) => b.onclick = async () => {
+      const k = b.dataset.dev;
+      try {
+        if (k === 'unlock') await act('demo.unlock', {}, { remember: false });
+        if (k === 'installing') await act('demo.installing', {}, { remember: false });
+        if (k === 'job') { await act('demo.job', {}); nav(8); }
+        if (k === 'jobfail') { await act('demo.job', { failAt: 'secret' }); nav(8); }
+        if (k === 'reset') await act('reset', {}, { remember: false });
+      } catch (e) { toast(e.message || String(e)); }
+    });
+  }
+
+  // ---------- 잡동사니 ----------
+  let toastT;
+  function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200); }
+
+  // ---------- 시작 ----------
+  api('state').then((s) => { S = s; job = s.job; render(); connectEvents(); }).catch(() => setConn(false));
+})();
