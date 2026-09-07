@@ -1,4 +1,4 @@
-# 배포용 ZIP 만들기 (개발자용)
+﻿# 배포용 ZIP 만들기 (개발자용)
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\make-zip.ps1
 # 결과: 배포본 폴더의 상위 폴더에 FSG_Distribution_Kit_<버전>.zip
 # 제외: .git, .install, .secrets, node_modules, web/src·public 등 빌드 소스가 아닌 실행에 불필요한 것은 포함(소스 공개), 기록·결과 파일 제외

@@ -42,13 +42,27 @@ export async function runSeed(ctx, report, body = {}) {
     TEMPLATE_DIR: dir,
     SEED_SKIP_IF_INITIALIZED: body.force ? '' : '1'
   };
-  const r = await ctx.exec.run('node', [script], { cwd: ctx.kitRoot, env, timeoutMs: 5 * 60 * 1000 });
+  // 실측(2026-09-07 e2e): 새 프로젝트에서 서비스 계정 키를 만든 직후 1~2분은 IAM 권한이 아직 퍼지지 않아
+  // Firestore 가 403 PERMISSION_DENIED 를 돌려준다(같은 키로 몇 분 뒤 실행하면 정상). → 최대 3분 기다리며 재시도.
+  let r = null;
+  for (let attempt = 1; attempt <= 10; attempt++) {
+    r = await ctx.exec.run('node', [script], { cwd: ctx.kitRoot, env, timeoutMs: 5 * 60 * 1000, quiet: attempt > 1 });
+    if (r.code === 0) break;
+    if (/PERMISSION_DENIED|"code": 403|HTTP 403/.test(r.out) && attempt < 10) {
+      ctx.bus.log(`서비스 계정 권한이 아직 반영되지 않았습니다. 20초 뒤 다시 시도합니다 (${attempt}/9)`, 'warn');
+      if (report) report.step('seed', `초기 데이터 등록 — 권한 반영 대기 중 (${attempt}/9)`);
+      await new Promise((res) => setTimeout(res, 20000));
+      continue;
+    }
+    break;
+  }
   if (r.code !== 0) {
     const t = r.out;
-    if (/PERMISSION_DENIED|403/.test(t)) throw new InstallError('SEED_PERMISSION', '초기 데이터를 쓸 권한이 없어요. 서비스 계정 키가 이 프로젝트 것인지 확인하세요.', { detail: t.slice(-600) });
+    if (/PERMISSION_DENIED|403/.test(t)) throw new InstallError('SEED_PERMISSION', '서비스 계정 권한이 아직 반영되지 않았어요. 1~2분 뒤 [다시 시도]를 누르세요. (새 프로젝트에서 흔한 지연입니다)', { actions: [{ id: 'retry', label: '다시 시도' }], detail: t.slice(-600) });
     if (/ENOTFOUND|ECONNRESET|fetch failed|ETIMEDOUT/i.test(t)) throw new InstallError('NETWORK', '인터넷 연결이 불안정해요. 연결을 확인한 뒤 다시 시도하세요.', { detail: t.slice(-400) });
     throw new InstallError('SEED', '초기 데이터를 등록하지 못했어요.', { detail: t.slice(-800) });
   }
+  if (report) report.step('seed', '초기 데이터 등록');
   const skipped = /이미 초기화/.test(r.out);
   const detail = skipped ? '이미 등록되어 있어 그대로 둠' : `집단 ${groups.length}개, 역할·광고 항목 기본값`;
   ctx.store.patch({ install: { ...ctx.store.state.install, seeded: true, seededAt: new Date().toISOString() } }); ctx.emitState();
