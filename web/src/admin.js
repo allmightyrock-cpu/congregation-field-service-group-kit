@@ -2213,7 +2213,7 @@ function renderRoster(data, msg = '') {
     <p class="eyebrow">회중 서기</p>
     <h1>집단 편성표</h1>
     ${msg ? `<p class="savemsg">${esc(msg)}</p>` : ''}
-    <p class="muted">성원 이름을 다른 집단 열로 끌어 놓으면 집단 이동을 처리합니다. 비활성 성원은 편성표에서 제외됩니다.</p>
+    <p class="muted">성원 이름을 다른 집단 열로 끌어 놓으면 집단 이동을 처리합니다. 비활성 성원은 편성표에서 제외됩니다. 집단 이름 아래 [감독자·보조자]를 누르면 그 집단의 감독자·보조자를 지정합니다.</p>
     <div class="member-toolbar roster-actions">
       <button class="primary" id="roster-refresh">새로고침</button>
       <button class="primary soft" id="roster-print">PDF 저장/인쇄</button>
@@ -2223,7 +2223,7 @@ function renderRoster(data, msg = '') {
     <div class="roster-scroll">
       <table class="roster-table" id="roster-board">
         <thead><tr>${data.columns.map((col) => `
-          <th class="roster-drop" data-group="${esc(col.groupKey)}">${esc(col.label)}</th>`).join('')}</tr></thead>
+          <th class="roster-drop" data-group="${esc(col.groupKey)}">${esc(col.label)}<br><button type="button" class="roster-lead-btn" data-group="${esc(col.groupKey)}" title="감독자·보조자 지정">감독자·보조자</button></th>`).join('')}</tr></thead>
         <tbody>${tableRows}</tbody>
       </table>
     </div>
@@ -2233,7 +2233,68 @@ function renderRoster(data, msg = '') {
   document.getElementById('roster-refresh').onclick = () => rosterScreen();
   document.getElementById('roster-print').onclick = () => printRoster();
   document.getElementById('roster-publish').onclick = () => publishRosterImage();
+  document.querySelectorAll('.roster-lead-btn').forEach((b) => { b.onclick = () => leaderAssignDialog(data, b.dataset.group); });
   wireRosterDrag(data);
+}
+
+// ---------- 집단 감독자·보조자 지정 (groups/{g}.overseerName / assistantName) ----------
+function leaderAssignDialog(data, groupKey) {
+  const group = data.groups[groupKey] || {};
+  const label = GROUP_LABELS[groupKey] || groupKey;
+  const members = (data.membersByGroup[groupKey] || []).filter((m) => m.active !== false);
+  const names = [...new Set(members.map((m) => String(m.name || '').trim()).filter(Boolean))];
+  const pick = (id, current) => {
+    const cur = String(current || '').trim();
+    const inList = names.includes(cur);
+    return `
+      <select id="${id}-sel">
+        <option value="">(지정 안 함)</option>
+        ${names.map((n) => `<option value="${esc(n)}" ${n === cur ? 'selected' : ''}>${esc(n)}</option>`).join('')}
+        <option value="__custom" ${cur && !inList ? 'selected' : ''}>직접 입력…</option>
+      </select>
+      <input type="text" id="${id}-txt" maxlength="40" placeholder="이름 직접 입력" value="${cur && !inList ? esc(cur) : ''}" ${cur && !inList ? '' : 'hidden'}>`;
+  };
+  const old = document.getElementById('leader-dialog');
+  if (old) old.remove();
+  const wrap = document.createElement('div');
+  wrap.id = 'leader-dialog';
+  wrap.className = 'leader-dialog';
+  wrap.innerHTML = `
+    <div class="leader-card">
+      <h2>${esc(label)} 집단 감독자·보조자</h2>
+      <p class="muted">이 집단 성원 중에서 고르거나 이름을 직접 입력합니다. 편성표·성원 앱 홈에 바로 표시됩니다.</p>
+      <label>집단 감독자</label>${pick('ld-ov', group.overseerName)}
+      <label>보조자</label>${pick('ld-as', group.assistantName)}
+      <p id="ld-msg" class="savemsg"></p>
+      <div class="member-toolbar">
+        <button type="button" class="primary" id="ld-save">저장</button>
+        <button type="button" class="link" id="ld-cancel">취소</button>
+      </div>
+    </div>`;
+  document.body.appendChild(wrap);
+  const wire = (id) => {
+    const sel = document.getElementById(`${id}-sel`), txt = document.getElementById(`${id}-txt`);
+    sel.onchange = () => { txt.hidden = sel.value !== '__custom'; if (!txt.hidden) txt.focus(); };
+  };
+  wire('ld-ov'); wire('ld-as');
+  const value = (id) => {
+    const sel = document.getElementById(`${id}-sel`), txt = document.getElementById(`${id}-txt`);
+    return (sel.value === '__custom' ? txt.value : sel.value).trim().slice(0, 40);
+  };
+  document.getElementById('ld-cancel').onclick = () => wrap.remove();
+  wrap.onclick = (e) => { if (e.target === wrap) wrap.remove(); };
+  document.getElementById('ld-save').onclick = async () => {
+    const overseerName = value('ld-ov'), assistantName = value('ld-as');
+    if (overseerName && overseerName === assistantName) { document.getElementById('ld-msg').textContent = '감독자와 보조자가 같은 사람입니다.'; return; }
+    document.getElementById('ld-msg').textContent = '저장 중…';
+    try {
+      await updateDoc(doc(db, 'groups', groupKey), { overseerName, assistantName, updatedAt: serverTimestamp(), updatedBy: session?.uid || 'editor' });
+      wrap.remove();
+      rosterScreen(`${label} 집단 감독자·보조자를 저장했습니다.`);
+    } catch (e) {
+      document.getElementById('ld-msg').textContent = '저장 실패: ' + (e.code === 'permission-denied' ? '권한이 없습니다(회중 서기 권한 필요). 보안 규칙이 최신인지 확인하세요.' : e.message);
+    }
+  };
 }
 
 function rosterCellHtml(col, row) {

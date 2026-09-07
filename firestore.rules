@@ -225,7 +225,14 @@ service cloud.firestore {
     // ---------- groups (집단) ----------
     match /groups/{g} {
       allow read:  if signedIn();
-      allow write: if false;                     // 서버/마이그레이션 전용
+      allow write: if false;                     // 생성·삭제·그 외 필드는 서버/마이그레이션 전용
+      // 회중 서기(canWriteCongMembers): 감독자·보조자 이름만 수정 가능 — 편집자 화면 [감독자·보조자 지정]
+      allow update: if isEditor() && cBool('canWriteCongMembers')
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['overseerName', 'assistantName', 'updatedAt', 'updatedBy'])
+        && request.resource.data.get('overseerName', '') is string
+        && request.resource.data.get('overseerName', '').size() <= 40
+        && request.resource.data.get('assistantName', '') is string
+        && request.resource.data.get('assistantName', '').size() <= 40;
 
       // 명단(공개 안전 필드만: 이름·표시명·순번·활성)
       match /members/{m} {
