@@ -173,10 +173,9 @@ export async function runInstall(ctx, body, report) {
   }
   report.done('secret', 'FIREBASE_SERVICE_ACCOUNT');
 
-  // 4) 초기 데이터 — Step 6 에서 구현
+  // 4) 초기 데이터 (steps/seed.mjs) — 이미 초기화된 프로젝트면 건너뜀
   report.step('seed');
-  if (typeof ctx.seed === 'function') await ctx.seed(report);
-  else { ctx.bus.log('초기 데이터 등록은 다음 업데이트(Step 6)에서 연결됩니다.', 'warn'); report.done('seed', '건너뜀(다음 단계에서 구현)'); }
+  await ctx.seed(report, { force: !!body.forceSeed });
 
   // 5) web/dist/config.js
   report.step('config');

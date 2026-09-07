@@ -23,6 +23,17 @@ if (!projectId) {
 const accessToken = await getAccessToken(serviceAccount);
 const base = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
 
+// 재실행 안전장치: 이미 초기화된 프로젝트(config/app 존재)는 건너뛴다(PIN·집단 정보 덮어쓰기 방지).
+// 설치 도우미가 SEED_SKIP_IF_INITIALIZED=1 로 호출한다. 강제로 다시 쓰려면 이 변수를 비워서 실행.
+if (process.env.SEED_SKIP_IF_INITIALIZED === '1') {
+  const chk = await fetch(`${base}/config/app`, { headers: { authorization: `Bearer ${accessToken}` } });
+  if (chk.ok) {
+    console.log(`이미 초기화된 프로젝트입니다(config/app 있음): ${projectId} — 초기 데이터 등록을 건너뜁니다.`);
+    process.exit(0);
+  }
+  if (chk.status !== 404) throw new Error(`config/app 확인 실패: ${chk.status} ${await chk.text()}`);
+}
+
 function csv(name) {
   const text = readFileSync(resolve(templatesDir, name), 'utf8').replace(/^\uFEFF/, '');
   const lines = text.split(/\r?\n/).filter((line) => line.trim() && !line.trim().startsWith('#'));

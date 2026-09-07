@@ -1,6 +1,14 @@
 export const MEMBER_GENDERS = ['', '형제', '자매'];
 export const MEMBER_ROLES = ['', '장로', '봉사의 종', '전도인'];
-export const GROUP_ORDER = ['daebang', 'buyeong', 'jihaeng', 'jugong1', 'jugong3', 'human1', 'human2'];
+// 집단 순서: 기본값은 배포본 표준 키. 앱이 시작할 때 Firestore `groups` 컬렉션(sortOrder) 로 갱신한다(setGroupOrder).
+// 같은 배열 객체를 제자리에서 바꾸므로 import 한 쪽에서도 최신 순서가 보인다.
+export const GROUP_ORDER = ['group1', 'group2', 'group3'];
+export function setGroupOrder(keys = []) {
+  const next = keys.map((k) => String(k || '').trim()).filter(Boolean);
+  if (!next.length) return GROUP_ORDER;
+  GROUP_ORDER.splice(0, GROUP_ORDER.length, ...next);
+  return GROUP_ORDER;
+}
 export const ROSTER_NOTICE_KEY = 'roster';
 
 export function nextMemberSeq(members = []) {

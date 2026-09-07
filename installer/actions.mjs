@@ -10,6 +10,7 @@ import { isValidSlug } from './lib/state.mjs';
 import { openBrowser } from './lib/open.mjs';
 import * as G from './steps/google.mjs';
 import * as C from './steps/cloudflare.mjs';
+import * as Seed from './steps/seed.mjs';
 
 const OPEN_ALLOW = [
   /^https:\/\/([a-z0-9-]+\.)*google\.com\//i,
@@ -25,6 +26,7 @@ const OPEN_ALLOW = [
 
 export function createActions(ctx) {
   const { store, bus, exec, jobs, spec, kitRoot, toolsBin, emitState, dev } = ctx;
+  ctx.seed = (report, body) => Seed.runSeed(ctx, report, body);   // 설치 실행(steps/cloudflare.mjs) 4단계에서 호출
   const notReady = (what) => async () => {
     throw new InstallError('NOT_READY', `${what} 기능은 아직 연결되지 않았어요(개발 진행 중). 다음 업데이트에서 이어집니다.`, { actions: [] });
   };

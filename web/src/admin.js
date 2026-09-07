@@ -16,7 +16,7 @@ import { parseMwbWeeks, buildMidBodyAll, parseMidBody, mergeWeeks, pruneExpired,
 import { titleByNo, noByTitle, numberedTitle, isRetiredTalkNo, RETIRED_FROM } from './talk-titles.js';
 import { defaultDutyData, parseDutyData, buildDutyHtml, buildDutyPlain } from './duty.js';
 import {
-  GROUP_ORDER, ROSTER_NOTICE_KEY, MEMBER_GENDERS, MEMBER_ROLES,
+  GROUP_ORDER, setGroupOrder, ROSTER_NOTICE_KEY, MEMBER_GENDERS, MEMBER_ROLES,
   buildMemberPayload, buildMemberPrivatePayload, buildRosterColumns, buildRosterMove,
   memberFormDefaults, nextMemberId, nextMemberSeq, rosterNoticePayload, rosterPagePayload
 } from './admin-members.js';
@@ -32,11 +32,33 @@ const ROLE_LABELS = {
   coord: '회중 조정자', life: '생활과 봉사 감독자',
   talk: '공개강연 조정자', secretary: '회중 서기', service: '봉사 감독자', elder: '회중 장로'
 };
-const GROUP_LABELS = {
-  group1: '\u0031\uc9d1\ub2e8',
-  group2: '\u0032\uc9d1\ub2e8',
-  group3: '\u0033\uc9d1\ub2e8'
+let GROUP_LABELS = {
+  group1: '1집단',
+  group2: '2집단',
+  group3: '3집단'
 };
+// 집단 이름·순서를 Firestore `groups` 컬렉션에서 읽어 라벨과 GROUP_ORDER 를 갱신(회중마다 집단 수·이름이 다름)
+let groupsSynced = false;
+async function syncGroupsFromDb() {
+  if (groupsSynced || !db) return;
+  try {
+    const snap = await getDocs(collection(db, 'groups'));
+    const list = [];
+    snap.forEach((d) => { const v = d.data() || {}; if (v.active !== false) list.push({ key: d.id, name: v.name || d.id, sortOrder: Number(v.sortOrder) || 999 }); });
+    list.sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+    if (list.length) {
+      const prevKeys = Object.keys(GROUP_LABELS);
+      GROUP_LABELS = Object.fromEntries(list.map((g) => [g.key, g.name]));
+      setGroupOrder(list.map((g) => g.key));
+      // 로그인 화면이 이미 떠 있고 집단 목록을 보여 주는 중이면 갱신
+      const sel = document.getElementById('key');
+      if (sel && [...sel.options].some((o) => prevKeys.includes(o.value))) sel.innerHTML = keyOptions('group');
+    }
+    groupsSynced = true;
+  } catch (e) {
+    console.warn('groups sync failed:', e);
+  }
+}
 let appEl = document.querySelector('#app');
 const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
   .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -58,6 +80,7 @@ let onExitToMember = null;
 export function startAdminApp(options = {}) {
   appEl = options.root || document.querySelector('#app');
   loginSearch = options.search ?? location.search;
+  syncGroupsFromDb();   // 로그인 화면 표시와 병행(집단 목록은 로그인 완료 전까지 도착)
   onExitToMember = typeof options.onExit === 'function' ? options.onExit : null;
   session = options.session || null;
   rendered = [];
@@ -122,6 +145,7 @@ async function doLogin(scope, key, pin) {
     if (!res.ok || !data.ok) return loginScreen(loginError(data.error));
     const cred = await signInWithCustomToken(auth, data.customToken);
     session = { scope, key, claims: (await cred.user.getIdTokenResult()).claims, uid: cred.user.uid };
+    await syncGroupsFromDb();
     home();
   } catch (e) {
     loginScreen('오류: ' + e.message);
