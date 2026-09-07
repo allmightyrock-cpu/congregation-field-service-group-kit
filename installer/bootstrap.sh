@@ -28,13 +28,16 @@ LOG_DIR="$RUNTIME_ROOT/logs"
 SPEC="$INSTALLER_DIR/runtime.json"
 SERVER="$INSTALLER_DIR/server.mjs"
 
-RESET=0; NO_LAUNCH=0; NO_BROWSER=0
+RESET=0; NO_LAUNCH=0; NO_BROWSER=0; UPDATE=0
+UPDATE_URL="${FSG_UPDATE_URL:-https://codeload.github.com/allmightyrock-cpu/congregation-field-service-group-kit/zip/refs/heads/main}"
 for a in "$@"; do
   case "$a" in
     --reset) RESET=1 ;;
     --no-launch) NO_LAUNCH=1 ;;
     --no-browser) NO_BROWSER=1 ;;
-    *) echo "알 수 없는 옵션: $a (사용 가능: --reset --no-launch --no-browser)"; exit 2 ;;
+    --update) UPDATE=1 ;;
+    --update-url=*) UPDATE_URL="${a#--update-url=}" ;;
+    *) echo "알 수 없는 옵션: $a (사용 가능: --reset --no-launch --no-browser --update)"; exit 2 ;;
   esac
 done
 
@@ -179,6 +182,47 @@ else
   { [ "$HAVE_W" = "$WANT_W" ] && [ "$HAVE_F" = "$WANT_F" ] && [ -x "$TOOLS_BIN/wrangler" ] && [ -x "$TOOLS_BIN/firebase" ]; } \
     || fail "설치 결과가 예상과 다릅니다 (wrangler '$HAVE_W', firebase-tools '$HAVE_F')."
   ok "wrangler $HAVE_W, firebase-tools $HAVE_F 설치 완료 ($(( $(date +%s) - T0 ))초)"
+fi
+
+# ---------- 업데이트: 최신 배포본으로 프로그램 파일 교체(설정·키·데이터 보존) ----------
+kit_version() { sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$1/VERSION.json" 2>/dev/null | head -n 1; }
+if [ "$UPDATE" = "1" ]; then
+  title "업데이트  최신 배포본 내려받기"
+  have_internet || fail "인터넷에 연결할 수 없습니다." "연결을 확인하고 다시 실행하세요."
+  mkdir -p "$DOWNLOAD_DIR"
+  ZIP="$DOWNLOAD_DIR/kit-update.zip"; rm -f "$ZIP"
+  step "내려받는 중: $UPDATE_URL"
+  curl -fL --progress-bar --retry 3 -o "$ZIP" "$UPDATE_URL" || fail "내려받기 실패." "잠시 후 다시 실행하세요."
+  step "압축 푸는 중..."
+  TMPX="$DOWNLOAD_DIR/update-$$"; rm -rf "$TMPX"; mkdir -p "$TMPX"
+  unzip -q -o "$ZIP" -d "$TMPX" || { rm -rf "$TMPX"; fail "압축 풀기 실패."; }
+  SRC="$TMPX"
+  if [ ! -f "$SRC/VERSION.json" ]; then
+    SRC="$(find "$TMPX" -mindepth 2 -maxdepth 2 -name VERSION.json | head -n 1 | xargs -I{} dirname {})"
+    [ -n "$SRC" ] || { rm -rf "$TMPX"; fail "내려받은 파일이 배포본이 아닙니다(VERSION.json 없음)."; }
+  fi
+  OLDV="$(kit_version "$KIT_ROOT")"; NEWV="$(kit_version "$SRC")"
+  step "현재 버전: $OLDV  →  새 버전: $NEWV"
+  CFG="$KIT_ROOT/web/dist/config.js"; CFGBK="$DOWNLOAD_DIR/config.backup.js"
+  [ -f "$CFG" ] && cp -f "$CFG" "$CFGBK"
+  rm -rf "$KIT_ROOT/web/dist/assets"
+  for e in "$SRC"/* "$SRC"/.[!.]*; do
+    [ -e "$e" ] || continue
+    n="$(basename "$e")"
+    case "$n" in .git|.install|.secrets|node_modules|.github) continue ;; esac
+    if [ -d "$e" ]; then
+      mkdir -p "$KIT_ROOT/$n"
+      ( cd "$e" && find . -type d -name node_modules -prune -o -type f -print | while IFS= read -r f; do
+          mkdir -p "$KIT_ROOT/$n/$(dirname "$f")"; cp -f "$f" "$KIT_ROOT/$n/$f"; done )
+    else
+      cp -f "$e" "$KIT_ROOT/$n"
+    fi
+  done
+  if [ -f "$CFGBK" ] && grep -q 'projectId: *"[^"][^"]*"' "$CFGBK"; then cp -f "$CFGBK" "$CFG"; step "회중 설정 파일(config.js) 보존"; fi
+  chmod +x "$KIT_ROOT/설치.command" "$KIT_ROOT/업데이트.command" "$KIT_ROOT/installer/bootstrap.sh" 2>/dev/null || true
+  rm -rf "$TMPX"
+  ok "프로그램 파일 교체 완료 ($OLDV → $NEWV). 설정·키·데이터는 그대로입니다."
+  export FSG_MODE=update
 fi
 
 # ---------- 3/3 실행 ----------

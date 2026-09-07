@@ -13,11 +13,16 @@
 #        -NoLaunch   실행환경만 준비하고 설치 화면은 열지 않음(점검용)
 #        -NoBrowser  서버는 실행하되 브라우저 자동 열기는 생략
 
+#        -Update     GitHub 에서 최신 배포본을 받아 프로그램 파일만 교체(설정·키·데이터 보존) 후 재배포 화면 열기
+#        -UpdateUrl  (점검용) 최신 배포본 ZIP 주소를 직접 지정
+
 [CmdletBinding()]
 param(
   [switch]$Reset,
   [switch]$NoLaunch,
-  [switch]$NoBrowser
+  [switch]$NoBrowser,
+  [switch]$Update,
+  [string]$UpdateUrl
 )
 
 $ErrorActionPreference = 'Stop'
@@ -235,6 +240,70 @@ function Ensure-Tools($spec) {
   Write-Ok "wrangler $haveW, firebase-tools $haveF 설치 완료 ($([int]$sw.Elapsed.TotalSeconds)초)"
 }
 
+# ---------- 업데이트: 최신 배포본으로 프로그램 파일 교체 ----------
+$DefaultUpdateUrl = 'https://codeload.github.com/allmightyrock-cpu/congregation-field-service-group-kit/zip/refs/heads/main'
+function Read-KitVersion([string]$dir) {
+  try { return ((Get-Content -Path (Join-Path $dir 'VERSION.json') -Raw -Encoding UTF8 | ConvertFrom-Json).version + '') } catch { return '' }
+}
+function Update-Kit {
+  Write-Title '업데이트  최신 배포본 내려받기'
+  $url = if ($UpdateUrl) { $UpdateUrl } elseif ($env:FSG_UPDATE_URL) { $env:FSG_UPDATE_URL } else { $DefaultUpdateUrl }
+  if (-not (Test-Internet)) { Fail-With '인터넷에 연결할 수 없습니다.' '연결을 확인하고 다시 실행하세요.' }
+  New-Item -ItemType Directory -Force -Path $DownloadDir | Out-Null
+  $zip = Join-Path $DownloadDir 'kit-update.zip'
+  if (Test-Path $zip) { Remove-Item $zip -Force }
+  Write-Step "내려받는 중: $url"
+  try { Download-File -Url $url -Dest $zip } catch { Fail-With "내려받기 실패: $($_.Exception.Message)" '잠시 후 다시 실행하세요.' }
+
+  Write-Step '압축 푸는 중...'
+  $tmpX = Join-Path $DownloadDir ('update-' + [guid]::NewGuid().ToString('N'))
+  New-Item -ItemType Directory -Force -Path $tmpX | Out-Null
+  try {
+    Expand-Archive -Path $zip -DestinationPath $tmpX -Force
+    $src = $tmpX
+    if (-not (Test-Path (Join-Path $src 'VERSION.json'))) {
+      $inner = Get-ChildItem -Path $tmpX -Directory | Where-Object { Test-Path (Join-Path $_.FullName 'VERSION.json') } | Select-Object -First 1
+      if (-not $inner) { Fail-With '내려받은 파일이 배포본이 아닙니다(VERSION.json 없음).' }
+      $src = $inner.FullName
+    }
+    $oldVer = Read-KitVersion $KitRoot
+    $newVer = Read-KitVersion $src
+    Write-Step "현재 버전: $oldVer  →  새 버전: $newVer"
+
+    # 보존: 회중 설정 파일(dist/config.js), 진행 상태(.install), 키(.secrets)
+    $cfg = Join-Path $KitRoot 'web\dist\config.js'
+    $cfgBackup = Join-Path $DownloadDir 'config.backup.js'
+    if (Test-Path $cfg) { Copy-Item $cfg $cfgBackup -Force }
+
+    $skip = @('.git', '.install', '.secrets', 'node_modules', '.github')
+    # 오래된 빌드 파일이 쌓이지 않도록 dist\assets 는 비우고 새로 채움
+    $assets = Join-Path $KitRoot 'web\dist\assets'
+    if (Test-Path $assets) { Remove-Item $assets -Recurse -Force }
+    foreach ($e in Get-ChildItem -Path $src -Force) {
+      if ($skip -contains $e.Name) { continue }
+      $target = Join-Path $KitRoot $e.Name
+      if ($e.PSIsContainer) {
+        # 하위 node_modules 는 건드리지 않고 나머지를 덮어씀
+        Get-ChildItem -Path $e.FullName -Recurse -Force | Where-Object { $_.FullName -notmatch '\\node_modules(\\|$)' } | ForEach-Object {
+          $rel = $_.FullName.Substring($e.FullName.Length)
+          $dest = Join-Path $target $rel
+          if ($_.PSIsContainer) { New-Item -ItemType Directory -Force -Path $dest | Out-Null }
+          else { New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dest) | Out-Null; Copy-Item $_.FullName $dest -Force }
+        }
+      } else {
+        Copy-Item $e.FullName $target -Force
+      }
+    }
+    if (Test-Path $cfgBackup) {
+      $bk = Get-Content -Path $cfgBackup -Raw -Encoding UTF8
+      if ($bk -match 'projectId:\s*"[^"]+"') { Copy-Item $cfgBackup $cfg -Force; Write-Step '회중 설정 파일(config.js) 보존' }
+    }
+    Write-Ok "프로그램 파일 교체 완료 ($oldVer → $newVer). 설정·키·데이터는 그대로입니다."
+  } finally {
+    if (Test-Path $tmpX) { Remove-Item $tmpX -Recurse -Force -ErrorAction SilentlyContinue }
+  }
+}
+
 # ---------- 단계 3: 설치 도우미 실행 ----------
 function Start-InstallerServer {
   Write-Title '3/3  설치 도우미 실행'
@@ -244,6 +313,7 @@ function Start-InstallerServer {
   $env:FSG_RUNTIME_DIR = $RuntimeRoot
   $env:FSG_INSTALLER_LOG = $script:LogPath
   if ($NoBrowser) { $env:FSG_NO_BROWSER = '1' }
+  if ($Update) { $env:FSG_MODE = 'update' }
   Write-Step '브라우저가 자동으로 열립니다. 이 창은 닫지 말고 그대로 두세요(닫으면 도우미가 종료됩니다).'
   $rc = Run-Native -File $NodeExe -Arguments @("`"$ServerPath`"") -WorkDir $KitRoot
   return $rc
@@ -282,6 +352,7 @@ try {
 
   Ensure-Node -spec $spec -archKey $archKey
   Ensure-Tools -spec $spec
+  if ($Update) { Update-Kit }
 
   if ($NoLaunch) {
     Write-Host ''

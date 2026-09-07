@@ -83,7 +83,7 @@ Congregation Field Service Group Kit v1.0.0
 
 ## 5. 공개 전 주의 사항
 
-- `.env` 파일이 포함되어 있지 않은지 확인합니다.
+- `.env` 파일, `.secrets/`, `.install/`, 실제 값이 든 `web/dist/config.js` 가 포함되어 있지 않은지 확인합니다.
 - 서비스 계정 JSON 파일이 포함되어 있지 않은지 확인합니다.
 - 실제 성원 명단이나 운영 PIN이 들어 있지 않은지 확인합니다.
 - 예제 CSV만 포함되어 있는지 확인합니다.

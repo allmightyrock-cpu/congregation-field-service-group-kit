@@ -28,6 +28,7 @@ const TOOLS_BIN = path.join(RUNTIME_ROOT, 'tools', 'node_modules', '.bin');
 const NO_BROWSER = process.env.FSG_NO_BROWSER === '1';
 const DEV = process.env.FSG_DEV === '1';
 const UI_DIR = path.join(__dirname, 'ui');
+let UPDATE_MODE = process.env.FSG_MODE === 'update';   // 업데이트.cmd 로 실행됨: 프로그램 파일은 이미 교체됨 → 재배포만
 
 function defaultRuntimeRoot() {
   if (IS_WIN) return path.join(process.env.LOCALAPPDATA || os.homedir(), 'FSG_Installer', 'runtime');
@@ -41,6 +42,14 @@ const kitVersion = readJson(path.join(KIT_ROOT, 'VERSION.json')) || {};
 
 const store = new StateStore(KIT_ROOT);
 store.load();
+if (UPDATE_MODE) {
+  if (store.state.install?.status === 'ok') {
+    store.patch({ currentStep: 8 });           // 바로 '설치 진행(재배포)' 화면으로
+  } else {
+    UPDATE_MODE = false;                       // 설치를 끝낸 적이 없으면 일반 설치 흐름
+    console.log('  이 PC에는 설치 완료 기록이 없어 일반 설치 흐름으로 진행합니다.');
+  }
+}
 const bus = new Bus(KIT_ROOT);
 const exec = makeExec({ toolsBin: TOOLS_BIN, nodeExe: process.execPath, bus, kitRoot: KIT_ROOT });
 const jobs = new JobRunner(bus);
@@ -58,7 +67,7 @@ function publicState() {
     meta: {
       kitRoot: KIT_ROOT, runtimeRoot: RUNTIME_ROOT, kitVersion: kitVersion.version || '',
       platform: `${IS_WIN ? 'Windows' : process.platform === 'darwin' ? 'macOS' : process.platform} (${os.arch()})`,
-      node: process.version, logFile: bus.logFile
+      node: process.version, logFile: bus.logFile, updateMode: UPDATE_MODE
     }
   };
 }

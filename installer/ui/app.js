@@ -440,15 +440,24 @@
         const j = job && /^(install\.|demo\.job)/.test(job.name) ? job : null;
         const st = S.state.install || {};
         const steps = j ? j.steps : [];
-        return `<h1>설치 진행</h1><p class="lead">${st.status === 'ok' ? '설치가 끝났습니다.' : j && j.status === 'running' ? '설치 중입니다. 창을 닫지 마세요.' : j && j.status === 'error' ? '설치가 중단되었습니다. 원인을 확인하고 다시 시도하세요.' : '설치를 시작하지 않았습니다.'}</p>
+        const upd = !!(S.meta && S.meta.updateMode);
+        const finishedNow = j && j.status === 'ok';
+        const lead = upd && !j
+          ? `새 버전 프로그램 파일을 받았습니다 (배포본 ${esc(S.meta.kitVersion || '')}). <b>[다시 배포]</b>를 누르면 서버와 사이트를 최신으로 갱신합니다. 회중 데이터·PIN·설정은 그대로 유지됩니다.`
+          : finishedNow ? (upd ? '업데이트 배포가 끝났습니다.' : '설치가 끝났습니다.')
+          : j && j.status === 'running' ? (upd ? '업데이트 중입니다. 창을 닫지 마세요.' : '설치 중입니다. 창을 닫지 마세요.')
+          : j && j.status === 'error' ? '중단되었습니다. 원인을 확인하고 다시 시도하세요.'
+          : st.status === 'ok' ? '이전에 설치를 마쳤습니다. 다시 배포하려면 아래 버튼을 누르세요.' : '설치를 시작하지 않았습니다.';
+        const btnLabel = j ? (j.status === 'error' ? '다시 시도' : '다시 배포') : (upd || st.status === 'ok' ? '다시 배포' : '설치 시작');
+        return `<h1>${upd ? '업데이트 배포' : '설치 진행'}</h1><p class="lead">${lead}</p>
           ${jobListHtml(steps)}
           <div id="err-host"></div>
-          ${st.status === 'ok' ? '<div class="okcard">모든 단계가 끝났습니다 ✓ 잠시 후 완료 화면으로 넘어갑니다.</div>' : ''}
-          ${!j || j.status !== 'running' ? `<div class="btnrow">${st.status !== 'ok' ? '<button type="button" class="btn" id="b-install">' + (j ? '다시 시도' : '설치 시작') + '</button>' : ''}</div>` : ''}`;
+          ${finishedNow ? '<div class="okcard">모든 단계가 끝났습니다 ✓ 잠시 후 완료 화면으로 넘어갑니다.</div>' : ''}
+          ${!j || j.status !== 'running' ? `<div class="btnrow">${finishedNow ? '' : `<button type="button" class="btn" id="b-install">${btnLabel}</button>`}</div>` : ''}`;
       },
       bind(el) {
         const b = $('#b-install', el); if (b) b.onclick = () => startInstall();
-        if ((S.state.install || {}).status === 'ok') setTimeout(() => { if (cur() === 8) nav(9); }, 1200);
+        if (job && /^(install\.|demo\.job)/.test(job.name) && job.status === 'ok') setTimeout(() => { if (cur() === 8) nav(9); }, 1200);
       }
     },
 

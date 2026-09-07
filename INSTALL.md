@@ -1,151 +1,74 @@
-# 설치 안내 가이드
+# 설치 기술 안내 (진행자·개발자용)
 
-이 문서는 `Congregation Field Service Group Kit`를 새 회중 환경에 설치하기 위한 안내입니다.
+일반 사용자는 `처음_설치_안내.pdf` 를 보면 됩니다. 이 문서는 설치 도우미가 내부에서 무엇을 하는지, 문제가 생겼을 때 어디를 보면 되는지 설명합니다.
 
-처음 설치하는 사용자는 모든 기술 내용을 이해할 필요가 없습니다. 아래 값만 준비하면 설치 담당자가 설치 도우미로 진행할 수 있습니다.
+## 1. 구조
 
-## 1. 설치 전에 준비할 값
-
-### 설치 담당자 PC 준비
-
-설치 담당자 PC에는 Node.js가 설치되어 있어야 합니다. 설치 도우미가 내부적으로 웹 화면을 빌드하고 필요한 패키지를 설치할 때 Node.js와 npm을 사용합니다.
-
-Node.js 공식 사이트:
-
-```text
-https://nodejs.org/
+```
+설치.cmd ─▶ installer/bootstrap.ps1 ─┐
+설치.command ─▶ installer/bootstrap.sh ┴▶ (포터블 Node) installer/server.mjs ─▶ 브라우저 http://127.0.0.1:<포트>/
 ```
 
-Windows에서는 공식 사이트에서 `LTS` 버전의 `Windows Installer (.msi)`를 내려받아 기본값으로 설치합니다.
+| 구성 | 위치 | 역할 |
+|---|---|---|
+| 부트스트랩 | `installer/bootstrap.ps1` (Windows, PowerShell 5.1) / `installer/bootstrap.sh` (macOS, bash 3.2) | 포터블 Node 24 다운로드+SHA-256 검증, npm 으로 wrangler·firebase-tools 설치, 서버 실행. 준비된 항목은 건너뜀 |
+| 실행환경 위치 | Windows `%LOCALAPPDATA%\FSG_Installer\runtime`, macOS `~/Library/Application Support/FSG_Installer/runtime` | 배포본 폴더 밖(동기화 폴더 회피). `FSG_RUNTIME_DIR` 로 변경 가능 |
+| 고정 버전 | `installer/runtime.json` | Node 버전·해시, wrangler·firebase-tools 버전의 단일 출처 |
+| 서버 | `installer/server.mjs` | 127.0.0.1 전용. 화면 정적 파일, `/api/state`, `/api/events`(SSE), `/api/action/<name>`, `/oauth/callback` |
+| 상태 | `.install/install-state.json` | 단계별 완료·산출값(비밀값 없음). 재실행 시 이어하기 |
+| 기록 | `.install/logs/install-<날짜>.log` | 마스킹된 로그 |
+| 키 | `.secrets/<프로젝트>-service-account.json` | 서비스 계정 키. Worker 시크릿 업로드 외 미전송 |
 
-### 회중 정보
+## 2. 단계별 처리 (installer/steps)
 
-- 회중 이름
-- 야외 봉사 집단 개수
-- 각 집단 이름
+| 화면 | 모듈 | 처리 |
+|---|---|---|
+| 0 사전 점검 | `lib/precheck.mjs` | Google/Cloudflare/nodejs.org 접속, 필수 파일 9개, Node 버전, wrangler·firebase 실행 |
+| 2 회중 정보 | `lib/slug.mjs` | 한글 회중명 → 로마자 영문 이름 → 프로젝트 ID `<slug>-fsg`, Worker `<slug>-fsg-api`, Pages `<slug>-fsg` |
+| 3 Google | `lib/gauth.mjs`, `steps/google.mjs` | 도우미 자체 OAuth(설치형 앱, 루프백 `127.0.0.1:<포트>/oauth/callback`) → 토큰을 firebase CLI 자격증명 저장소에 저장 → `firebase projects:create`(ASCII 표시명), Firestore API 켜기 + `firestore:databases:create (default) --location asia-northeast3`, `apps:create WEB`, REST `webApps/{id}/config` |
+| 4 로그인 기능 | `steps/google.mjs` | 무료 Firebase Auth 는 API 로 초기화 불가 → 콘솔 딥링크에서 사용자가 "시작하기", 도우미는 `admin/v2/projects/{id}/config` 로 검증 |
+| 5 서버 키 | `steps/google.mjs` | IAM API 로 `firebase-adminsdk-*` 서비스 계정 키 생성 → `.secrets/`. 폴백: 콘솔에서 키 생성 후 다운로드 폴더 자동 탐색 |
+| 6 Cloudflare | `steps/cloudflare.mjs` | `wrangler auth create fsg-installer --browser=false`(명명 프로필: 사용자의 다른 wrangler 로그인과 분리) → REST 로 계정 확인·선택 |
+| 8 설치 실행 | `steps/cloudflare.mjs`, `steps/seed.mjs` | ① `firebase deploy --only firestore:rules,firestore:indexes` ② `wrangler deploy --name … --var FIREBASE_PROJECT_ID --var TOKEN_MODE:signed --secrets-file`(FIREBASE_SERVICE_ACCOUNT) ③ `secret list` 확인 ④ `scripts/setup-from-csv.mjs`(config/app 있으면 건너뜀) ⑤ `web/dist/config.js` 생성 ⑥ `pages project create` ⑦ `pages deploy web/dist` ⑧ 사이트/설정/Worker `/health` 검증 |
+| 9 완료 | `steps/result.mjs` | QR, `설치결과_<회중명>.txt`(키·PIN 미포함) |
 
-처음에는 집단 이름만 정합니다. 집단 성원 이름은 나중에 직접 입력하거나 엑셀/CSV로 한꺼번에 등록할 수 있습니다.
+모든 wrangler 호출은 `--profile fsg-installer` + `CLOUDFLARE_ACCOUNT_ID`, 모든 firebase 호출은 `--account <email> --json --non-interactive`.
 
-### Firebase에서 가져올 값
+## 3. 오류 표시
 
-Firebase 접속 주소:
+CLI 원문은 기록에만 남고 화면에는 `installer/lib/errors.mjs` 의 매핑(네트워크, 로그인 만료, 이름 중복, API 미사용, 결제 필요, 권한, 한도, 포트 충돌, 디스크 부족 등)에 따른 한국어 원인·조치가 표시됩니다. firebase CLI 는 JSON 에 원인을 안 남기므로 `firebase-debug.log` 에서 HTTP 오류 줄을 읽어 씁니다.
 
-```text
-https://console.firebase.google.com/
+## 4. 업데이트
+
+`업데이트.cmd` / `업데이트.command` → 부트스트랩 `-Update`: GitHub `main` ZIP 을 받아 `.git/.install/.secrets/node_modules` 를 제외한 프로그램 파일을 덮어쓰고(`web/dist/assets` 는 비운 뒤 채움), `web/dist/config.js` 는 보존, 서버를 `FSG_MODE=update` 로 실행 → "업데이트 배포" 화면에서 [다시 배포](= 설치 실행 8단계 재실행, 시딩은 건너뜀).
+
+점검용: `FSG_UPDATE_URL` 환경변수 또는 `-UpdateUrl`(Windows) / `--update-url=`(macOS) 로 ZIP 주소를 바꿀 수 있습니다.
+
+## 5. 수동으로 해야 할 때 (도우미 없이)
+
+실행환경이 준비되어 있다면(포터블 Node 경로 `…/FSG_Installer/runtime/node`, 도구 `…/runtime/tools/node_modules/.bin`):
+
+```bash
+firebase deploy --only firestore:rules,firestore:indexes --project <프로젝트ID> --account <이메일>
+cd worker && wrangler deploy --name <slug>-fsg-api --var FIREBASE_PROJECT_ID:<프로젝트ID> --var TOKEN_MODE:signed --secrets-file <시크릿json> --profile fsg-installer
+wrangler pages deploy web/dist --project-name <slug>-fsg --branch main --commit-dirty=true --profile fsg-installer
 ```
 
-준비할 값:
+시크릿 json 형식: `{"FIREBASE_SERVICE_ACCOUNT": "<서비스 계정 JSON 전체를 문자열로>"}`.
+`web/dist/config.js` 는 `window.__FSG_CONFIG__ = { apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId, workerUrl }`.
 
-- Firebase Project ID
-- Firebase Web App 설정값
-  - `apiKey`
-  - `authDomain`
-  - `projectId`
-  - `storageBucket`
-  - `messagingSenderId`
-  - `appId`
-- Firebase 서비스 계정 JSON 파일
+## 6. 옵션
 
-### Cloudflare에서 정할 값
-
-Cloudflare 접속 주소:
-
-```text
-https://dash.cloudflare.com/
-```
-
-준비할 값:
-
-- Cloudflare 계정
-- Worker 이름
-- Pages 프로젝트 이름
-
-예시:
-
-```text
-Worker 이름: congregation-fsg-sample-api
-Pages 이름: congregation-fsg-sample
-```
-
-## 2. 쉬운 설치 도우미 실행
-
-Windows에서 배포본 폴더를 열고 아래 파일을 실행합니다.
-
-```text
-쉬운설치.cmd
-```
-
-설치 도우미는 다음 순서로 진행됩니다.
-
-1. 회중 이름 입력
-2. 집단 개수와 집단 이름 입력
-3. Firebase 설정값 입력
-4. Firebase 서비스 계정 JSON 파일 선택
-5. Cloudflare Worker/Pages 이름 입력
-6. 초기 CSV 파일 생성
-7. 웹 환경 파일 생성
-8. Worker 설정 파일 생성
-9. Firebase 초기 데이터 등록
-10. Firebase rules/indexes 배포
-11. Cloudflare Worker 배포
-12. 웹 화면 빌드
-13. Cloudflare Pages 배포
-
-## 3. 기본 PIN
-
-처음 설치 후 기본 PIN은 다음과 같습니다.
-
-| 역할 | 기본 PIN |
+| 실행 | 설명 |
 |---|---|
-| 조정자 | `1111` |
-| 서기 | `2222` |
-| 봉사감독자 | `3333` |
-| 생활과봉사 감독자 | `4444` |
-| 공개강연 조정자 | `5555` |
-| 집단감독자·보조자 | `0000` |
+| `설치.cmd -Reset` | 실행환경(Node·도구)을 지우고 다시 준비 |
+| `설치.cmd -NoLaunch` | 실행환경만 준비 |
+| `설치.cmd -NoBrowser` | 브라우저 자동 열기 생략 |
+| macOS: `bash 설치.command --reset` 등 | 동일 |
+| `FSG_DEV=1` | 서버에 개발 확인용 패널(가짜 진행) 표시 |
 
-설치 후 실제 운영 전에 반드시 변경하세요.
+## 7. 보안 메모
 
-## 4. 설치 후 확인할 것
-
-- 성원 화면이 열리는지 확인
-- 집단 목록이 회중 상황에 맞게 표시되는지 확인
-- 온라인 봉사 보고 화면이 열리는지 확인
-- 회중 역할자 로그인 확인
-- 집단감독자·보조자 로그인 확인
-- 보고 현황 권한이 의도대로 보이는지 확인
-- 광고와 집단 편성표 화면 연결 확인
-
-## 5. 업데이트 안내
-
-GitHub 저장소로 설치한 경우:
-
-```text
-업데이트확인.cmd
-```
-
-ZIP으로 설치한 경우:
-
-1. 최신 ZIP을 내려받습니다.
-2. 기존 `web/.env`를 보존합니다.
-3. 기존 `worker/wrangler.toml`에서 회중 고유 이름을 확인합니다.
-4. Firebase 서비스 계정 JSON과 실제 성원 자료를 덮어쓰지 않습니다.
-5. 필요한 소스만 새 배포본으로 교체합니다.
-
-## 6. 자동 업데이트에 대한 기준
-
-완전 자동 업데이트는 권장하지 않습니다.
-
-이유:
-
-- 각 회중마다 Firebase 프로젝트가 다릅니다.
-- 각 회중마다 Cloudflare Worker/Pages 이름이 다릅니다.
-- 실제 성원 명단과 보고 기록은 절대 덮어쓰면 안 됩니다.
-
-대신 다음 방식을 권장합니다.
-
-- GitHub에서 프로그램 소스만 업데이트
-- 회중별 환경값과 데이터는 유지
-- 업데이트 후 웹 빌드와 Pages 배포만 다시 실행
-
-이 기준이면 프로그램은 최신 상태를 유지하면서도 회중 데이터는 안전하게 보존할 수 있습니다.
+- 도우미 서버는 127.0.0.1 에만 열리고, 쓰기 요청은 전용 헤더와 Host/Origin 검사를 거칩니다.
+- 기록·결과 파일에서 서비스 계정 키, OAuth 토큰, JWT, PIN 은 자동으로 가려집니다.
+- `.install`, `.secrets`, `설치결과_*.txt`, `firebase-debug.log` 는 git 에 올라가지 않습니다.
