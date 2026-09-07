@@ -52,6 +52,9 @@ export function mapCliError(text, context = '') {
       actions: [{ id: 'suffix', label: '뒤에 -2 붙여서 진행' }, { id: 'rename', label: '직접 입력' }], detail: t
     });
   }
+  if (has(/has not been used in project|it is disabled|SERVICE_DISABLED|API has not been enabled/i)) {
+    return new InstallError('API_DISABLED', '필요한 Google API 가 아직 켜지지 않았어요. 잠시 후 [다시 시도]를 누르면 도우미가 켜고 이어서 진행합니다.', { detail: t });
+  }
   if (has(/PERMISSION_DENIED|permission denied|403|does not have permission|Insufficient Permission/i)) {
     return new InstallError('PERMISSION', '이 계정에 권한이 없어요. 프로젝트 소유자 계정으로 로그인했는지 확인하세요.', {
       actions: [{ id: 'relogin', label: '다른 계정으로 로그인' }], detail: t

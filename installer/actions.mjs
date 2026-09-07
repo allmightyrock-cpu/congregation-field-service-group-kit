@@ -3,11 +3,12 @@
 //  - job  : 시간이 걸리는 작업(진행 상황은 SSE 'job' 으로 중계)
 // Step 4(Google)·5(Cloudflare)·6(시딩) 에서 NOT_READY 자리표시자를 실제 구현으로 바꾼다.
 
-import { spawn } from 'node:child_process';
 import { InstallError } from './lib/errors.mjs';
 import { runPrecheck } from './lib/precheck.mjs';
 import { suggestSlug, namesFromSlug, defaultGroupNames } from './lib/slug.mjs';
 import { isValidSlug } from './lib/state.mjs';
+import { openBrowser } from './lib/open.mjs';
+import * as G from './steps/google.mjs';
 
 const OPEN_ALLOW = [
   /^https:\/\/([a-z0-9-]+\.)*google\.com\//i,
@@ -89,14 +90,37 @@ export function createActions(ctx) {
       }
     },
 
-    // ---------- 화면 3~6: Step 4·5 에서 구현 ----------
-    'google.login': { job: true, run: notReady('Google 로그인') },
-    'google.project': { job: true, run: notReady('Firebase 프로젝트 준비') },
-    'auth.open': { run: notReady('인증 설정 페이지 열기') },
-    'auth.verify': { job: true, run: notReady('인증 상태 확인') },
-    'sakey.open': { run: notReady('키 만들기 페이지 열기') },
-    'sakey.scan': { run: notReady('다운로드 폴더에서 키 찾기') },
-    'sakey.pick': { run: notReady('키 파일 등록') },
+    // ---------- 화면 3: Google 로그인 + 프로젝트 준비 (steps/google.mjs) ----------
+    'google.status': { run: async () => G.loginStatus(ctx) },
+    'google.login': { run: async (body) => G.startLogin(ctx, body) },            // 브라우저 열기 → /oauth/callback 에서 완료
+    'google.use': { run: async (body) => G.useAccount(ctx, String(body.email || '')) },
+    'google.projects': { run: async () => G.listProjects(ctx) },
+    'google.project': {
+      job: true,
+      steps: [{ key: 'project', label: 'Firebase 프로젝트' }, { key: 'firestore', label: '데이터 저장소(Firestore)' }, { key: 'webapp', label: '웹 앱 등록' }, { key: 'config', label: '설정값 받아오기' }],
+      run: (body, report) => G.provisionProject(ctx, body, report)
+    },
+
+    // ---------- 화면 4: 로그인 기능(Authentication) ----------
+    'auth.open': { run: async () => { const id = store.state.firebase.projectId; if (!id) throw new InstallError('NO_PROJECT', '먼저 프로젝트를 준비하세요.', { actions: [] }); openBrowser(G.authConsoleUrl(id)); return { ok: true }; } },
+    'auth.verify': {
+      job: true,
+      steps: [{ key: 'check', label: '로그인 기능이 켜졌는지 확인' }],
+      run: (body, report) => G.enableAuth(ctx, body, report)
+    },
+    'auth.check': { run: async () => ({ ok: true, enabled: await G.verifyAuth(ctx) }) },
+
+    // ---------- 화면 5: 서비스 계정 키 ----------
+    'sakey.auto': {
+      job: true,
+      steps: [{ key: 'find', label: '서비스 계정 찾기' }, { key: 'key', label: '키 만들어 저장' }],
+      run: (body, report) => G.createServiceAccountKey(ctx, body, report)
+    },
+    'sakey.open': { run: async () => { const id = store.state.firebase.projectId; if (!id) throw new InstallError('NO_PROJECT', '먼저 프로젝트를 준비하세요.', { actions: [] }); openBrowser(G.saConsoleUrl(id)); return { ok: true }; } },
+    'sakey.scan': { run: async () => G.scanDownloads(ctx) },
+    'sakey.pick': { run: async (body) => G.pickKeyFile(ctx, body) },
+
+    // ---------- 화면 6: Step 5 에서 구현 ----------
     'cf.login': { job: true, run: notReady('Cloudflare 로그인') },
 
     // ---------- 화면 7→8: Step 5·6 에서 구현 ----------
@@ -155,11 +179,4 @@ export function createActions(ctx) {
   }
 
   return actions;
-}
-
-export function openBrowser(url) {
-  const IS_WIN = process.platform === 'win32';
-  if (IS_WIN) spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `start "" "${url}"`], { detached: true, stdio: 'ignore', windowsHide: true, windowsVerbatimArguments: true }).unref();
-  else if (process.platform === 'darwin') spawn('open', [url], { detached: true, stdio: 'ignore' }).unref();
-  else spawn('xdg-open', [url], { detached: true, stdio: 'ignore' }).unref();
 }

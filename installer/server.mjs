@@ -16,7 +16,9 @@ import { Bus } from './lib/bus.mjs';
 import { makeExec } from './lib/exec.mjs';
 import { JobRunner } from './lib/jobs.mjs';
 import { InstallError } from './lib/errors.mjs';
-import { createActions, openBrowser } from './actions.mjs';
+import { createActions } from './actions.mjs';
+import { openBrowser } from './lib/open.mjs';
+import { handleCallback } from './lib/gauth.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const IS_WIN = process.platform === 'win32';
@@ -61,7 +63,14 @@ function publicState() {
   };
 }
 const emitState = () => bus.emit('state', publicState());
-const actions = createActions({ store, bus, exec, jobs, spec, kitRoot: KIT_ROOT, runtimeRoot: RUNTIME_ROOT, toolsBin: TOOLS_BIN, emitState, dev: DEV });
+const actions = createActions({ store, bus, exec, jobs, spec, kitRoot: KIT_ROOT, runtimeRoot: RUNTIME_ROOT, toolsBin: TOOLS_BIN, emitState, dev: DEV, port: () => PORT });
+
+function callbackPage(title, body) {
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${title}</title>
+  <style>body{font-family:"Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;background:#f3f6fa;margin:0;display:grid;place-items:center;height:100vh}
+  .c{background:#fff;border:1px solid #d9e1ec;border-radius:4px;padding:28px 32px;max-width:520px;text-align:center}h1{color:#123f73;font-size:20px;margin:0 0 10px}p{color:#5d6b7c;margin:6px 0}</style></head>
+  <body><div class="c"><h1>${title}</h1>${body}</div></body></html>`;
+}
 
 // ---------- HTTP ----------
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
@@ -96,6 +105,22 @@ const server = http.createServer(async (req, res) => {
     const p = url.pathname;
 
     if (!sameOrigin(req)) return send(403, 'Forbidden', 'text/plain');
+
+    // Google 로그인 되돌아오기(루프백). 브라우저가 Google 에서 이리로 돌아온다.
+    if (req.method === 'GET' && p === '/oauth/callback') {
+      try {
+        const { email } = await handleCallback(PORT, Object.fromEntries(url.searchParams));
+        store.patch({ firebase: { ...store.state.firebase, account: email } });
+        bus.log(`Google 로그인 완료: ${email}`);
+        emitState();
+        return send(200, callbackPage('Google 로그인 완료', `<p><b>${email}</b> 계정으로 로그인했습니다.</p><p>이 탭은 닫고 <b>설치 도우미</b> 탭으로 돌아가세요.</p>`), MIME['.html']);
+      } catch (e) {
+        const ue = e instanceof InstallError ? e : new InstallError('LOGIN_FAIL', 'Google 로그인 처리 중 문제가 생겼어요.', { detail: e?.stack || String(e) });
+        bus.log(`Google 로그인 실패: [${ue.code}] ${ue.message}`, 'error'); if (ue.detail) bus.log(ue.detail, 'error');
+        bus.emit('login-error', ue.toJSON());
+        return send(200, callbackPage('Google 로그인 실패', `<p>${ue.message}</p><p>이 탭을 닫고 설치 도우미에서 다시 시도하세요.</p>`), MIME['.html']);
+      }
+    }
 
     // 정적 화면
     if (req.method === 'GET' && (p === '/' || p === '/index.html')) return send(200, fs.readFileSync(path.join(UI_DIR, 'index.html')), MIME['.html']);

@@ -54,6 +54,7 @@
     es.addEventListener('state', (ev) => { S = JSON.parse(ev.data); job = S.job || job; render(); });
     es.addEventListener('job', (ev) => { job = JSON.parse(ev.data); render(); });
     es.addEventListener('log', (ev) => { const e = JSON.parse(ev.data); logs.push(e); if (logs.length > 600) logs.shift(); renderLog(); });
+    es.addEventListener('login-error', (ev) => { localErr = JSON.parse(ev.data); render(); });
   }
   function setConn(on) { const c = $('#conn'); c.textContent = on ? '연결됨' : '연결 끊김 — 설치 창(검은 창)이 닫혔는지 확인하세요'; c.className = 'conn ' + (on ? 'on' : 'off'); }
 
@@ -162,7 +163,17 @@
     el.querySelectorAll('[data-erract]').forEach((b) => b.onclick = async () => {
       const a = b.dataset.erract;
       if (a === 'copylog') return copyLog();
-      if (a === 'retry' || a === 'relogin' || a === 'suffix' || a === 'rename') {
+      if (a === 'relogin') { try { await act('google.login', {}, { remember: false }); toast('브라우저에서 로그인을 마치고 돌아오세요.'); } catch {} return; }
+      if (a === 'openauth') { try { await act('auth.open', {}, { remember: false }); } catch (e) { toast(e.message); } return; }
+      if (a === 'opensa') { try { await act('sakey.open', {}, { remember: false }); } catch (e) { toast(e.message); } return; }
+      if (a === 'rename') {
+        const cur = (S.state.firebase && S.state.firebase.projectId) || ((S.state.cong.slug || '') + '-fsg');
+        const v = prompt('사용할 Firebase 프로젝트 ID를 입력하세요 (소문자·숫자·하이픈, 6~30자):', cur);
+        if (!v) return;
+        try { await act('google.project', { mode: 'new', projectId: v.trim().toLowerCase() }); } catch {}
+        return;
+      }
+      if (a === 'retry' || a === 'suffix') {
         if (!lastAction) return;
         try { await act(lastAction.name, { ...lastAction.body, choice: a }); } catch {}
       }
@@ -270,44 +281,114 @@
     google: {
       html() {
         const fb = S.state.firebase || {};
-        const running = job && /^google\./.test(job.name) && job.status === 'running';
-        return `<h1>Google 로그인과 Firebase 준비</h1><p class="lead">[Google로 로그인]을 누르면 브라우저 창이 열립니다. 회중용 Google 계정으로 로그인하고 허용을 누른 뒤 이 화면으로 돌아오세요.</p>
-          <ul class="clean"><li>로그인이 끝나면 도우미가 Firebase 프로젝트를 새로 만들고(권장) 데이터 저장소와 웹 앱을 등록합니다.</li><li>설정값 6개는 자동으로 받아옵니다. 복사해 붙여 넣을 것이 없습니다.</li></ul>
-          ${fb.projectId && fb.config ? `<div class="okcard">받아왔습니다 ✓ — 프로젝트 <code>${esc(fb.projectId)}</code></div>` : ''}
-          ${running ? jobListHtml(job.steps) : ''}
+        const running = job && job.name === 'google.project' && job.status === 'running';
+        const jobDone = job && job.name === 'google.project' && job.status !== 'running';
+        const acct = fb.account || '';
+        const c = S.state.cong || {};
+        return `<h1>Google 로그인과 Firebase 준비</h1><p class="lead">회중용 Google 계정으로 로그인하면, 도우미가 Firebase 프로젝트·데이터 저장소·웹 앱을 만들고 설정값을 자동으로 받아옵니다. 복사해 붙여 넣을 것이 없습니다.</p>
+          <h2>1. Google 계정</h2>
+          ${acct ? `<div class="okcard">로그인됨 ✓ — ${esc(acct)}</div>` : '<p class="muted">아직 로그인하지 않았습니다. 버튼을 누르면 브라우저 창이 열립니다. 계정을 고르고 <b>허용</b>을 누른 뒤 이 화면으로 돌아오세요.</p>'}
+          <div id="acct-list"></div>
+          <div class="btnrow"><button type="button" class="btn ${acct ? 'ghost' : 'big'}" id="b-glogin" ${running ? 'disabled' : ''}>${acct ? '다른 계정으로 로그인' : 'Google로 로그인'}</button></div>
+          <div id="login-err"></div>
+          ${acct ? `
+          <h2>2. Firebase 프로젝트</h2>
+          ${fb.projectId && fb.config ? `<div class="okcard">받아왔습니다 ✓ — 프로젝트 <code>${esc(fb.projectId)}</code> · 웹 앱 <code>${esc(fb.webAppId)}</code></div>` : `
+          <div class="field"><label><input type="radio" name="pmode" value="new" checked> 새로 만들기(권장) — <code id="p-newid">${esc(c.slug)}-fsg</code></label></div>
+          <div class="field"><label><input type="radio" name="pmode" value="existing"> 이 계정의 기존 프로젝트 사용</label>
+            <div id="p-existing" hidden style="margin:6px 0 0 22px"><select id="p-select" style="min-width:280px;padding:7px"><option value="">목록 불러오는 중…</option></select> <button type="button" class="btn tiny ghost" id="p-reload">새로 고침</button>
+            <div class="help">비어 있는 프로젝트를 고르세요. 이미 쓰는 프로젝트를 고르면 데이터가 섞일 수 있어요.</div></div></div>`}
+          ${running || jobDone ? jobListHtml(job.steps) : ''}
           <div id="err-host"></div>
-          <div class="btnrow"><button type="button" class="btn big" id="b-glogin" ${running ? 'disabled' : ''}>Google로 로그인</button></div>
+          ${!(fb.projectId && fb.config) ? `<div class="btnrow"><button type="button" class="btn big" id="b-provision" ${running ? 'disabled' : ''}>${jobDone && job.status === 'error' ? '다시 시도' : '프로젝트 준비 시작'}</button><span class="muted">1~2분 걸립니다.</span></div>` : ''}
+          ` : '<div id="err-host"></div>'}
           <p class="muted">로그인 창이 안 열리면 검은 창(설치 창)에 표시된 주소를 브라우저에 직접 붙여 넣으세요.</p>`;
       },
-      bind(el) { $('#b-glogin', el).onclick = () => act('google.login').catch(() => {}); }
+      bind(el) {
+        const fb = S.state.firebase || {};
+        $('#b-glogin', el).onclick = () => act('google.login', {}, { remember: false }).then(() => toast('브라우저에서 로그인을 마치고 돌아오세요.')).catch(() => {});
+        // 저장된 계정이 있으면 고를 수 있게
+        api('action/google.status', {}).then((s) => {
+          const others = (s.accounts || []).filter((e) => e !== fb.account);
+          if (!others.length) return;
+          $('#acct-list', el).innerHTML = `<p class="muted">이 PC에 저장된 다른 로그인: ${others.map((e) => `<button type="button" class="btn tiny ghost" data-use="${esc(e)}">${esc(e)} 사용</button>`).join(' ')}</p>`;
+          el.querySelectorAll('[data-use]').forEach((b) => b.onclick = () => act('google.use', { email: b.dataset.use }, { remember: false }).catch((e) => toast(e.message)));
+        }).catch(() => {});
+        const prov = $('#b-provision', el);
+        if (prov) {
+          const radios = el.querySelectorAll('input[name=pmode]');
+          const sel = $('#p-select', el);
+          const loadProjects = async () => {
+            sel.innerHTML = '<option value="">목록 불러오는 중…</option>';
+            try { const r = await api('action/google.projects', {}); sel.innerHTML = '<option value="">— 프로젝트 선택 —</option>' + r.projects.map((p) => `<option value="${esc(p.projectId)}">${esc(p.displayName)} (${esc(p.projectId)})</option>`).join(''); }
+            catch (e) { sel.innerHTML = `<option value="">불러오기 실패: ${esc(e.message)}</option>`; }
+          };
+          radios.forEach((r) => r.onchange = () => { const ex = $('#p-existing', el); ex.hidden = r.value !== 'existing' || !r.checked; if (r.value === 'existing' && r.checked && sel.options.length <= 1) loadProjects(); });
+          $('#p-reload', el).onclick = loadProjects;
+          prov.onclick = () => {
+            const mode = [...radios].find((r) => r.checked)?.value || 'new';
+            const body = mode === 'existing' ? { mode, projectId: sel.value } : { mode: 'new' };
+            if (mode === 'existing' && !sel.value) return toast('기존 프로젝트를 골라 주세요.');
+            act('google.project', body).catch(() => {});
+          };
+        }
+      }
     },
 
     auth: {
       html() {
         const fb = S.state.firebase || {};
-        const running = job && /^auth\./.test(job.name) && job.status === 'running';
-        return `<h1>로그인 기능 켜기</h1><p class="lead">Firebase의 로그인 기능(Authentication)은 콘솔에서 한 번 '시작하기'를 눌러야 켜집니다. 이 한 번의 클릭만 직접 해 주세요.</p>
-          <ol><li>[페이지 열기]를 누르면 해당 페이지가 열립니다.</li><li>페이지에서 <b>시작하기</b>를 누릅니다. 로그인 방법을 고르라고 하면 <b>익명</b>을 켜고 저장합니다.</li><li>돌아와서 [확인]을 누르면 켜졌는지 검사합니다.</li></ol>
-          ${fb.authEnabled ? '<div class="okcard">로그인 기능이 켜져 있습니다 ✓</div>' : ''}
-          ${running ? jobListHtml(job.steps) : ''}
+        const running = job && job.name === 'auth.verify' && job.status === 'running';
+        const j = job && job.name === 'auth.verify' ? job : null;
+        return `<h1>로그인 기능 켜기</h1><p class="lead">앱의 감독자·편집자 로그인은 Firebase의 로그인 기능(Authentication)을 씁니다. 이 기능은 Google 정책상 콘솔에서 <b>"시작하기"</b> 버튼을 한 번 직접 눌러야 켜집니다. 설치 전체에서 직접 클릭하는 건 이것 하나뿐입니다.</p>
+          ${fb.authEnabled ? '<div class="okcard">로그인 기능이 켜져 있습니다 ✓ — [다음]을 누르세요.</div>' : `
+          <ol>
+            <li><b>[페이지 열기]</b>를 누르면 Firebase 콘솔의 Authentication 페이지가 열립니다. (같은 Google 계정으로 로그인되어 있어야 해요)</li>
+            <li>페이지 가운데 <b>시작하기</b>(Get started)를 누릅니다. 로그인 방법을 고르는 화면이 나와도 아무것도 고르지 않아도 됩니다.</li>
+            <li>이 화면으로 돌아와 <b>[확인]</b>을 누릅니다.</li>
+          </ol>`}
+          ${j ? jobListHtml(j.steps) : ''}
           <div id="err-host"></div>
-          <div class="btnrow"><button type="button" class="btn ghost" id="b-aopen">페이지 열기</button><button type="button" class="btn" id="b-averify" ${running ? 'disabled' : ''}>확인</button></div>`;
+          <div class="btnrow">${fb.authEnabled ? '' : `<button type="button" class="btn big" id="b-aopen">페이지 열기</button><button type="button" class="btn" id="b-averify" ${running ? 'disabled' : ''}>확인</button>`}${fb.authEnabled ? '<button type="button" class="btn ghost" id="b-aopen">페이지 열기</button>' : ''}</div>`;
       },
-      bind(el) { $('#b-aopen', el).onclick = () => act('auth.open', {}, { remember: false }).catch(() => {}); $('#b-averify', el).onclick = () => act('auth.verify').catch(() => {}); }
+      bind(el) {
+        const v = $('#b-averify', el); if (v) v.onclick = () => act('auth.verify').catch(() => {});
+        $('#b-aopen', el).onclick = () => act('auth.open', {}, { remember: false }).then(() => toast('브라우저에서 "시작하기"를 누른 뒤 돌아와 [확인]을 누르세요.')).catch((e) => toast(e.message));
+      }
     },
 
     sakey: {
       html() {
         const fb = S.state.firebase || {};
-        return `<h1>서버 키 등록</h1><p class="lead">서버가 데이터에 접근하려면 "서비스 계정 키" 파일이 필요합니다. 페이지에서 키를 하나 만들어 내려받으면 도우미가 다운로드 폴더에서 자동으로 찾습니다.</p>
-          <ol><li>[키 만들기 페이지 열기] → 페이지에서 <b>새 비공개 키 생성</b> → <b>키 생성</b>. 파일이 다운로드됩니다.</li><li>돌아와서 [다운로드 폴더에서 찾기]를 누릅니다. 방금 받은 파일을 자동으로 제안합니다.</li></ol>
-          ${fb.saKeyPath ? `<div class="okcard">키 등록됨 ✓ — <code>${esc(fb.saKeyPath)}</code></div>` : ''}
-          <div id="sa-cands"></div>
+        const running = job && job.name === 'sakey.auto' && job.status === 'running';
+        const j = job && job.name === 'sakey.auto' ? job : null;
+        return `<h1>서버 키 등록</h1><p class="lead">서버가 데이터에 접근하려면 "서비스 계정 키"가 필요합니다. 도우미가 자동으로 만들어 이 PC의 배포본 폴더 안 <code>.secrets</code>에 저장합니다.</p>
+          ${fb.saKeyPath ? `<div class="okcard">키 등록됨 ✓ — <code>${esc(fb.saKeyPath)}</code>${fb.saClientEmail ? `<div class="muted">${esc(fb.saClientEmail)}</div>` : ''}</div>` : ''}
+          ${j ? jobListHtml(j.steps) : ''}
           <div id="err-host"></div>
-          <div class="btnrow"><button type="button" class="btn ghost" id="b-sopen">키 만들기 페이지 열기</button><button type="button" class="btn" id="b-sscan">다운로드 폴더에서 찾기</button></div>
-          <p class="muted">키 파일은 이 PC의 배포본 폴더 안 <code>.secrets</code>에만 복사되고, 서버에 비밀값으로 저장하는 것 외에는 어디에도 보내지 않습니다. 키 파일을 다른 사람에게 보내지 마세요.</p>`;
+          <div class="btnrow">${fb.saKeyPath ? '' : `<button type="button" class="btn big" id="b-sauto" ${running ? 'disabled' : ''}>자동으로 키 만들기</button>`}</div>
+          <details ${fb.saKeyPath ? '' : ''}><summary class="muted">자동으로 안 될 때(직접 만들기)</summary>
+            <ol><li>[키 만들기 페이지 열기] → 페이지에서 <b>새 비공개 키 생성</b> → <b>키 생성</b>. 파일이 다운로드됩니다.</li><li>돌아와서 [다운로드 폴더에서 찾기]를 누르면 방금 받은 파일을 제안합니다.</li></ol>
+            <div class="btnrow"><button type="button" class="btn ghost" id="b-sopen">키 만들기 페이지 열기</button><button type="button" class="btn ghost" id="b-sscan">다운로드 폴더에서 찾기</button></div>
+            <div id="sa-cands"></div>
+            <div class="field"><label for="f-sapath">또는 파일 경로 직접 입력</label><input type="text" id="f-sapath" placeholder="C:\\Users\\이름\\Downloads\\프로젝트-xxxx.json"> <button type="button" class="btn ghost" id="b-spick" style="margin-top:6px">이 파일 사용</button></div>
+          </details>
+          <p class="muted">키는 서버에 비밀값으로 저장하는 것 외에는 어디에도 보내지 않습니다. 키 파일을 다른 사람에게 보내지 마세요.</p>`;
       },
-      bind(el) { $('#b-sopen', el).onclick = () => act('sakey.open', {}, { remember: false }).catch(() => {}); $('#b-sscan', el).onclick = () => act('sakey.scan').catch(() => {}); }
+      bind(el) {
+        const a = $('#b-sauto', el); if (a) a.onclick = () => act('sakey.auto').catch(() => {});
+        $('#b-sopen', el).onclick = () => act('sakey.open', {}, { remember: false }).catch((e) => toast(e.message));
+        $('#b-sscan', el).onclick = async () => {
+          try {
+            const r = await act('sakey.scan', {}, { remember: false });
+            const host = $('#sa-cands', el);
+            if (!r.candidates.length) { host.innerHTML = '<p class="muted">최근 30일 안에 받은 서비스 계정 키 파일을 다운로드·바탕화면 폴더에서 찾지 못했어요.</p>'; return; }
+            host.innerHTML = `<ul class="checklist">${r.candidates.map((c) => `<li><span class="mark ${c.match ? 'ok' : ''}">${c.match ? '✓' : ''}</span><span><span class="lbl">${esc(c.name)}</span><div class="detail">${esc(c.projectId)} · ${esc(new Date(c.mtime).toLocaleString('ko-KR'))}${c.match ? '' : ' · <b>다른 프로젝트 키</b>'}</div>${c.match ? `<button type="button" class="btn tiny" data-pick="${esc(c.path)}">이 키 사용</button>` : ''}</span></li>`).join('')}</ul>`;
+            host.querySelectorAll('[data-pick]').forEach((b) => b.onclick = () => act('sakey.pick', { path: b.dataset.pick }, { remember: false }).then(() => toast('키를 등록했습니다.')).catch(() => {}));
+          } catch {}
+        };
+        $('#b-spick', el).onclick = () => act('sakey.pick', { path: $('#f-sapath', el).value }, { remember: false }).then(() => toast('키를 등록했습니다.')).catch(() => {});
+      }
     },
 
     cloudflare: {
