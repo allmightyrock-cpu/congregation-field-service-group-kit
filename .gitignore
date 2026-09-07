@@ -12,3 +12,5 @@ firebase-service-account*.json
 # 설치 도우미 산출물: 진행 상태·기록(.install), 서비스 계정 키 사본(.secrets) — 절대 커밋 금지
 .install/
 .secrets/
+설치결과_*.txt
+firebase-debug.log

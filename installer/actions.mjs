@@ -11,6 +11,7 @@ import { openBrowser } from './lib/open.mjs';
 import * as G from './steps/google.mjs';
 import * as C from './steps/cloudflare.mjs';
 import * as Seed from './steps/seed.mjs';
+import * as R from './steps/result.mjs';
 
 const OPEN_ALLOW = [
   /^https:\/\/([a-z0-9-]+\.)*google\.com\//i,
@@ -142,6 +143,11 @@ export function createActions(ctx) {
       ],
       run: withInstallStatus((body, report) => C.runInstall(ctx, body, report))
     },
+
+    // ---------- 화면 9: 완료 (steps/result.mjs) ----------
+    'result.save': { run: async () => R.saveResult(ctx) },
+    'result.reveal': { run: async (body) => R.revealFile(ctx, body.path) },
+    'result.text': { run: async () => ({ ok: true, text: R.buildResultText(ctx) }) },
 
     // ---------- 공통 ----------
     'open': {

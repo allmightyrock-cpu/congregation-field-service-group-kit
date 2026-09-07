@@ -164,6 +164,7 @@
       const a = b.dataset.erract;
       if (a === 'copylog') return copyLog();
       if (a === 'relogin') { try { await act('google.login', {}, { remember: false }); toast('브라우저에서 로그인을 마치고 돌아오세요.'); } catch {} return; }
+      if (a === 'relogin-cf') { try { await act('cf.login', { choice: 'relogin' }); toast('브라우저에서 Cloudflare 로그인을 마치고 돌아오세요.'); } catch {} return; }
       if (a === 'openauth') { try { await act('auth.open', {}, { remember: false }); } catch (e) { toast(e.message); } return; }
       if (a === 'opensa') { try { await act('sakey.open', {}, { remember: false }); } catch (e) { toast(e.message); } return; }
       if (a === 'opencf') { try { await act('cf.dash', {}, { remember: false }); } catch (e) { toast(e.message); } return; }
@@ -454,29 +455,44 @@
     done: {
       html() {
         const r = S.state.result || {}; const c = S.state.cong || {};
-        return `<h1>설치 완료</h1><p class="lead">${esc(c.name)} 야외 봉사 집단 앱이 준비되었습니다. 아래 주소를 성원에게 공유하세요.</p>
+        return `<h1>설치 완료</h1><p class="lead">${esc(c.name)} 야외 봉사 집단 앱이 준비되었습니다. 아래 주소를 성원에게 공유하세요. 휴대폰 카메라로 QR을 찍으면 바로 열립니다.</p>
           <div class="bigurl">${esc(r.siteUrl || '(주소 확인 중)')}</div>
-          <div class="btnrow"><button type="button" class="btn big" id="b-open-site" ${r.siteUrl ? '' : 'disabled'}>지금 열기</button><button type="button" class="btn ghost" id="b-save-result">결과 파일 저장</button></div>
+          <div class="btnrow"><button type="button" class="btn big" id="b-open-site" ${r.siteUrl ? '' : 'disabled'}>지금 열기</button><button type="button" class="btn ghost" id="b-copy-url">주소 복사</button><button type="button" class="btn ghost" id="b-save-result">결과 파일 저장</button>${r.savedPath ? '<button type="button" class="btn ghost" id="b-reveal">저장한 폴더 열기</button>' : ''}</div>
+          ${r.savedPath ? `<p class="muted">저장됨: <code>${esc(r.savedPath)}</code> <span class="muted">(키·PIN은 파일에 들어가지 않습니다)</span></p>` : ''}
           <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
-            <div class="qr" id="qr">QR (완료 화면 단계에서 추가)</div>
+            <div class="qr" id="qr" title="${esc(r.siteUrl || '')}">QR 준비 중…</div>
             <div style="flex:1;min-width:260px">
-              <h2>기본 PIN</h2>
+              <h2>기본 PIN <span class="muted">(첫 로그인 후 꼭 바꾸세요)</span></h2>
               <table class="kv"><tbody>${(r.pins || []).map((p) => `<tr><th>${esc(p.group)} · ${esc(p.role)}</th><td><code>${esc(p.pin)}</code></td></tr>`).join('') || '<tr><td class="muted">표시할 PIN이 없습니다.</td></tr>'}</tbody></table>
             </div>
           </div>
+          <h2>집단별 주소</h2>
+          <table class="kv"><tbody>${(c.groups || []).map((g) => `<tr><th>${esc(g.name)}</th><td><code>${esc((r.siteUrl || '') + '/?g=' + g.key)}</code></td></tr>`).join('')}</tbody></table>
           <h2>다음에 할 일 세 가지</h2>
-          <ol><li>감독자로 로그인해 <b>PIN을 바꾸세요</b>.</li><li>편집자 화면에서 <b>집단 성원을 입력</b>하세요.</li><li>성원에게 <b>접속 주소</b>를 안내하세요. 휴대폰에서는 "홈 화면에 추가"로 앱처럼 쓸 수 있습니다.</li></ol>
-          <p class="muted">서버 키 파일(.secrets 폴더)은 이 PC 밖으로 보내지 마세요. 이 도우미는 이제 닫아도 됩니다.</p>
+          <ol><li>편집자로 로그인해 <b>PIN을 바꾸세요</b>. (접속 주소 뒤에 <code>/?admin=1</code>)</li><li>편집자 화면에서 <b>집단 성원을 입력</b>하세요.</li><li>성원에게 <b>접속 주소</b>를 안내하세요. 휴대폰에서는 "홈 화면에 추가"로 앱처럼 쓸 수 있습니다.</li></ol>
+          <p class="muted">서버 키 파일(.secrets 폴더)은 이 PC 밖으로 보내지 마세요. 이 도우미는 이제 닫아도 됩니다. 나중에 업데이트할 때 설치 파일을 다시 실행하면 됩니다.</p>
           <div class="btnrow"><button type="button" class="btn ghost" id="b-quit">도우미 닫기</button></div>`;
       },
       bind(el) {
         const r = S.state.result || {};
         const o = $('#b-open-site', el); if (o) o.onclick = () => act('open', { url: r.siteUrl }, { remember: false }).catch((e) => toast(e.message));
-        $('#b-save-result', el).onclick = () => toast('결과 파일 저장은 완료 화면 단계에서 연결됩니다.');
+        $('#b-copy-url', el).onclick = async () => { try { await navigator.clipboard.writeText(r.siteUrl || ''); toast('주소를 복사했습니다.'); } catch { toast('복사하지 못했어요. 주소를 드래그해 복사하세요.'); } };
+        $('#b-save-result', el).onclick = () => act('result.save', {}, { remember: false }).then((res) => toast('저장했습니다: ' + res.path)).catch((e) => toast(e.message));
+        const rv = $('#b-reveal', el); if (rv) rv.onclick = () => act('result.reveal', {}, { remember: false }).catch((e) => toast(e.message));
         $('#b-quit', el).onclick = quit;
+        renderQr($('#qr', el), r.siteUrl);
       }
     }
   };
+
+  function renderQr(host, url) {
+    if (!host) return;
+    if (!url) { host.textContent = '주소가 정해지면 QR이 표시됩니다.'; return; }
+    if (typeof window.QRCode !== 'function') { host.textContent = 'QR 라이브러리를 불러오지 못했어요. 위 주소를 그대로 공유하세요.'; return; }
+    host.textContent = '';
+    try { new window.QRCode(host, { text: url, width: 164, height: 164, correctLevel: window.QRCode.CorrectLevel.M }); }
+    catch { host.textContent = 'QR 생성 실패. 위 주소를 그대로 공유하세요.'; }
+  }
 
   async function startInstall() {
     try { await act('install.run'); if (cur() !== 8) nav(8); } catch {}
