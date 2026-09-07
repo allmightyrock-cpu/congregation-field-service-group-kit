@@ -19,7 +19,7 @@ export function emptyState() {
     precheck: { ok: false, at: null, items: [] },
     cong: { name: '', slug: '', groupCount: 3, groups: [] },
     firebase: { account: '', projectId: '', webAppId: '', config: null, authEnabled: false, saKeyPath: '', saKeyProjectId: '', saClientEmail: '' },
-    cloudflare: { loggedIn: false, accountId: '', accountName: '', workerName: '', workerUrl: '', pagesProject: '', pagesUrl: '' },
+    cloudflare: { loggedIn: false, email: '', accountId: '', accountName: '', accounts: [], workerName: '', workerUrl: '', pagesProject: '', pagesUrl: '' },
     install: { status: 'idle', startedAt: null, finishedAt: null, tasks: {} , lastError: null },
     result: { siteUrl: '', workerUrl: '', pins: [], savedAt: null }
   };

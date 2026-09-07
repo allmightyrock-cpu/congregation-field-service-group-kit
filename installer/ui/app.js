@@ -166,6 +166,7 @@
       if (a === 'relogin') { try { await act('google.login', {}, { remember: false }); toast('브라우저에서 로그인을 마치고 돌아오세요.'); } catch {} return; }
       if (a === 'openauth') { try { await act('auth.open', {}, { remember: false }); } catch (e) { toast(e.message); } return; }
       if (a === 'opensa') { try { await act('sakey.open', {}, { remember: false }); } catch (e) { toast(e.message); } return; }
+      if (a === 'opencf') { try { await act('cf.dash', {}, { remember: false }); } catch (e) { toast(e.message); } return; }
       if (a === 'rename') {
         const cur = (S.state.firebase && S.state.firebase.projectId) || ((S.state.cong.slug || '') + '-fsg');
         const v = prompt('사용할 Firebase 프로젝트 ID를 입력하세요 (소문자·숫자·하이픈, 6~30자):', cur);
@@ -395,17 +396,25 @@
       html() {
         const cf = S.state.cloudflare || {};
         const running = job && /^cf\./.test(job.name) && job.status === 'running';
+        const j = job && job.name === 'cf.login' ? job : null;
+        const multi = (cf.accounts || []).length > 1;
         return `<h1>Cloudflare 로그인</h1><p class="lead">[Cloudflare로 로그인]을 누르면 브라우저가 열립니다. 로그인 후 <b>Allow</b>를 누르고 돌아오세요. 앱은 이 계정의 무료 요금제에 올라갑니다.</p>
           <table class="kv"><tbody>
             <tr><th>서버(Worker) 이름</th><td><code>${esc(cf.workerName || '-')}</code></td></tr>
             <tr><th>웹 사이트 프로젝트</th><td><code>${esc(cf.pagesProject || '-')}</code> → <code>https://${esc(cf.pagesProject || '…')}.pages.dev</code></td></tr>
           </tbody></table>
-          ${cf.loggedIn ? `<div class="okcard">로그인됨 ✓ ${cf.accountName ? '— ' + esc(cf.accountName) : ''}</div>` : ''}
-          ${running ? jobListHtml(job.steps) : ''}
+          ${cf.loggedIn ? `<div class="okcard">로그인됨 ✓ — ${esc(cf.email || '')}${cf.accountName ? ` · 계정: ${esc(cf.accountName)}` : ''}</div>` : ''}
+          ${multi ? `<div class="field"><label for="cf-acct">사용할 Cloudflare 계정</label><select id="cf-acct" style="padding:7px;min-width:280px">${cf.accounts.map((a) => `<option value="${esc(a.id)}" ${a.id === cf.accountId ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></div>` : ''}
+          ${j ? jobListHtml(j.steps) : ''}
           <div id="err-host"></div>
-          <div class="btnrow"><button type="button" class="btn big" id="b-cflogin" ${running ? 'disabled' : ''}>Cloudflare로 로그인</button></div>`;
+          <div class="btnrow"><button type="button" class="btn ${cf.loggedIn ? 'ghost' : 'big'}" id="b-cflogin" ${running ? 'disabled' : ''}>${cf.loggedIn ? '다른 계정으로 로그인' : 'Cloudflare로 로그인'}</button></div>
+          <p class="muted">로그인 창이 안 열리면 검은 창(설치 창)에 표시된 dash.cloudflare.com 주소를 브라우저에 직접 붙여 넣으세요. 계정이 없으면 그 화면에서 가입할 수 있어요.</p>`;
       },
-      bind(el) { $('#b-cflogin', el).onclick = () => act('cf.login').catch(() => {}); }
+      bind(el) {
+        const cf = S.state.cloudflare || {};
+        $('#b-cflogin', el).onclick = () => act('cf.login', cf.loggedIn ? { choice: 'relogin' } : {}).catch(() => {});
+        const sel = $('#cf-acct', el); if (sel) sel.onchange = () => act('cf.account', { id: sel.value }, { remember: false }).catch((e) => toast(e.message));
+      }
     },
 
     confirm: {

@@ -9,6 +9,7 @@ import { suggestSlug, namesFromSlug, defaultGroupNames } from './lib/slug.mjs';
 import { isValidSlug } from './lib/state.mjs';
 import { openBrowser } from './lib/open.mjs';
 import * as G from './steps/google.mjs';
+import * as C from './steps/cloudflare.mjs';
 
 const OPEN_ALLOW = [
   /^https:\/\/([a-z0-9-]+\.)*google\.com\//i,
@@ -120,11 +121,25 @@ export function createActions(ctx) {
     'sakey.scan': { run: async () => G.scanDownloads(ctx) },
     'sakey.pick': { run: async (body) => G.pickKeyFile(ctx, body) },
 
-    // ---------- 화면 6: Step 5 에서 구현 ----------
-    'cf.login': { job: true, run: notReady('Cloudflare 로그인') },
+    // ---------- 화면 6: Cloudflare (steps/cloudflare.mjs) ----------
+    'cf.login': {
+      job: true,
+      steps: [{ key: 'login', label: '브라우저에서 Cloudflare 로그인' }, { key: 'account', label: '계정 확인' }],
+      run: (body, report) => C.cfLogin(ctx, body, report)
+    },
+    'cf.account': { run: async (body) => C.chooseAccount(ctx, String(body.id || '')) },
+    'cf.dash': { run: async () => { openBrowser(C.dashUrl(ctx)); return { ok: true }; } },
 
-    // ---------- 화면 7→8: Step 5·6 에서 구현 ----------
-    'install.run': { job: true, run: withInstallStatus(notReady('설치 실행')) },
+    // ---------- 화면 7→8: 설치 실행 ----------
+    'install.run': {
+      job: true,
+      steps: [
+        { key: 'rules', label: '데이터 보안 규칙 배포' }, { key: 'worker', label: '서버(Worker) 배포' }, { key: 'secret', label: '서버에 키 저장 확인' },
+        { key: 'seed', label: '초기 데이터 등록' }, { key: 'config', label: '웹 설정 파일 생성' }, { key: 'pages', label: '웹 사이트 프로젝트 만들기' },
+        { key: 'deploy', label: '웹 사이트 배포' }, { key: 'verify', label: '접속 확인' }
+      ],
+      run: withInstallStatus((body, report) => C.runInstall(ctx, body, report))
+    },
 
     // ---------- 공통 ----------
     'open': {
