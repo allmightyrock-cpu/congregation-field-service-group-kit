@@ -227,11 +227,14 @@
       html() {
         const c = S.state.cong || {};
         const groups = c.groups && c.groups.length ? c.groups : [];
-        return `<h1>회중 정보</h1><p class="lead">회중 이름과 집단 수를 정합니다. 집단 이름은 자동으로 채워지며 나중에 앱에서도 바꿀 수 있습니다.</p>
+        return `<h1>회중 정보</h1><p class="lead">회중 이름, 집단 수, 그리고 <b>각 집단의 이름</b>을 정합니다. 집단 이름은 앱 화면과 접속 주소 안내에 그대로 표시됩니다.</p>
           <div class="field"><label for="f-name">회중 이름</label><input type="text" id="f-name" value="${esc(c.name)}" placeholder="예: 동두천 남부" autocomplete="off"><div class="help">앱 화면과 문서에 표시됩니다. "회중"은 빼고 적어도 됩니다.</div><div class="err" id="e-name"></div></div>
           <div class="field"><label for="f-slug">영문 이름 (인터넷 주소용)</label><input type="text" id="f-slug" value="${esc(c.slug)}" placeholder="자동 제안" autocomplete="off" spellcheck="false"><div class="help" id="h-slug">영문 소문자·숫자·하이픈, 4~22자. 이 이름으로 접속 주소가 정해집니다.</div><div class="err" id="e-slug"></div></div>
           <div class="field"><label for="f-count">집단 수</label><input type="number" id="f-count" min="1" max="12" value="${esc(c.groupCount || 3)}" style="max-width:120px"><div class="err" id="e-count"></div></div>
-          <div class="field"><label>집단 이름</label><div class="groups" id="f-groups">${groups.map((g, i) => `<input type="text" data-i="${i}" value="${esc(g.name)}">`).join('')}</div><div class="err" id="e-groups"></div></div>
+          <div class="field groups-field"><label>집단 이름 <span class="muted">— 회중에서 부르는 이름으로 고쳐 쓰세요 (예: 대방, 부영, 주공1단지)</span></label>
+            <div class="groups" id="f-groups">${groups.map((g, i) => groupRowHtml(i, g.name)).join('')}</div>
+            <div class="help">칸을 비워 두면 "1집단, 2집단…" 처럼 번호로 들어갑니다. 나중에 편집자 화면(집단 편성표)에서도 바꿀 수 있습니다.</div>
+            <div class="err" id="e-groups"></div></div>
           <h2>만들어질 이름 미리보기</h2>
           <table class="kv"><tbody>
             <tr><th>접속 주소(예정)</th><td><code id="p-site">-</code></td></tr>
@@ -254,7 +257,7 @@
         const rebuildGroups = () => {
           const n = Math.max(1, Math.min(12, parseInt(count.value, 10) || 1));
           const existing = [...groupsEl.querySelectorAll('input')].map((i) => i.value);
-          groupsEl.innerHTML = Array.from({ length: n }, (_, i) => `<input type="text" data-i="${i}" value="${esc(existing[i] ?? `${i + 1}집단`)}">`).join('');
+          groupsEl.innerHTML = Array.from({ length: n }, (_, i) => groupRowHtml(i, existing[i] ?? '')).join('');
         };
         let t;
         name.oninput = () => {
@@ -270,7 +273,7 @@
         preview();
         $('#b-save', el).onclick = async () => {
           ['name', 'slug', 'count', 'groups'].forEach((k) => $('#e-' + k, el).textContent = '');
-          const groups = [...groupsEl.querySelectorAll('input')].map((i) => ({ name: i.value }));
+          const groups = [...groupsEl.querySelectorAll('input')].map((i, idx) => ({ name: i.value.trim() || `${idx + 1}집단` }));
           try {
             const r = await act('cong.save', { name: name.value, slug: slug.value, groupCount: count.value, groups }, { remember: false });
             if (!r.ok) { for (const [k, v] of Object.entries(r.errors)) { const m = { name: 'name', slug: 'slug', groupCount: 'count', groups: 'groups' }[k]; if (m) $('#e-' + m, el).textContent = v; } return; }
@@ -505,6 +508,13 @@
 
   async function startInstall() {
     try { await act('install.run'); if (cur() !== 8) nav(8); } catch {}
+  }
+
+  // 집단 이름 한 줄: "n번 집단" 라벨 + 입력칸(비우면 번호 이름). 저장된 이름이 기본값("n집단")이면 빈칸+자리표시로 보여 고치기 쉽게
+  function groupRowHtml(i, name) {
+    const def = `${i + 1}집단`;
+    const v = String(name || '').trim();
+    return `<label class="group-row"><span class="group-no">${i + 1}번 집단</span><input type="text" data-i="${i}" value="${esc(v === def ? '' : v)}" placeholder="${esc(def)} (이름을 입력하세요)" autocomplete="off"></label>`;
   }
 
   function bindOpenLinks(el) {

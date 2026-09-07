@@ -62,8 +62,13 @@ ul.clean li { margin: 4px 0; }
 .field input:focus { outline: 2px solid #9fc0ea; border-color: var(--blue); }
 .field .help { color: var(--muted); font-size: 13px; margin-top: 3px; }
 .field .err { color: var(--bad); font-size: 13px; margin-top: 3px; }
-.groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; max-width: 640px; }
-.groups input { width: 100%; padding: 7px 9px; border: 1px solid #b9c4d2; border-radius: var(--r); font: inherit; }
+.groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px 14px; max-width: 700px; margin-top: 6px; }
+.group-row { display: grid; grid-template-columns: 74px 1fr; align-items: center; gap: 8px; font-weight: 700; margin: 0; }
+.group-row .group-no { color: var(--blue-deep); font-size: 13px; white-space: nowrap; }
+.groups input { width: 100%; padding: 8px 10px; border: 1px solid #b9c4d2; border-radius: var(--r); font: inherit; font-weight: 400; }
+.groups input::placeholder { color: #9aa7b6; font-weight: 400; }
+.groups input:focus { outline: 2px solid #9fc0ea; border-color: var(--blue); }
+.groups-field > label { display: block; font-weight: 700; margin-bottom: 2px; }
 .kv { width: 100%; border-collapse: collapse; font-size: 14px; }
 .kv th, .kv td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .kv th { width: 170px; color: var(--muted); font-weight: 700; }
