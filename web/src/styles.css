@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   color: #202124;
   background: #f6f7f9;
   font-family: "Noto Sans KR", NotoSansKR, "Malgun Gothic", "Apple SD Gothic Neo", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -3313,3 +3313,9 @@ h2.sec { font-size: 16px; color: #66788a; margin: 26px 0 10px; }
   mask: var(--i) center / contain no-repeat;
   -webkit-mask-mode: alpha; mask-mode: alpha;
 }
+
+/* 봉사 보고 현황 — 보고월 선택 */
+.period-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 6px 0 10px; }
+.period-bar label { font-weight: 700; }
+.period-bar select { padding: 6px 8px; font: inherit; border: 1px solid #b9c4d2; border-radius: 4px; background: #fff; }
+.period-bar small { flex-basis: 100%; }

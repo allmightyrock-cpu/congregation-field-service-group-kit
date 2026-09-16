@@ -831,13 +831,49 @@ async function noticeEditScreen(key) {
   };
 }
 
+// ---------- 보고월 선택(지난달 집계 보기) ----------
+// 보고월 = 성원이 활동한 달. 제출은 다음 달 1~10일(+그달 마지막 이틀)에 이루어지고,
+// 11일이 지나면 config.reportPeriod 가 다음 달로 넘어가므로 지난달을 골라 볼 수 있어야 한다.
+function reportPeriodOptions(currentPeriod, months = 24) {
+  const m = /^(\d{4})-(\d{2})$/.exec(currentPeriod || '');
+  let y = m ? Number(m[1]) : new Date().getFullYear();
+  let mo = m ? Number(m[2]) : new Date().getMonth() + 1;
+  const out = [];
+  for (let i = 0; i < months; i++) {
+    out.push(`${y}-${String(mo).padStart(2, '0')}`);
+    mo -= 1; if (mo < 1) { mo = 12; y -= 1; }
+  }
+  return out;
+}
+function reportPeriodLabel(p) {
+  const m = /^(\d{4})-(\d{2})$/.exec(p || '');
+  return m ? `${m[1]}년 ${Number(m[2])}월` : (p || '(보고월 미설정)');
+}
+function reportPeriodSelectorHtml(period, currentPeriod) {
+  const opts = reportPeriodOptions(currentPeriod);
+  if (period && !opts.includes(period)) opts.push(period);
+  return `<div class="period-bar">
+    <label for="period-select">보고월</label>
+    <select id="period-select">${opts.map((p) => `<option value="${esc(p)}" ${p === period ? 'selected' : ''}>${esc(reportPeriodLabel(p))}${p === currentPeriod ? ' (현재 보고월)' : ''}</option>`).join('')}</select>
+    ${period && period !== currentPeriod ? '<button type="button" class="link" id="period-now">현재 보고월로</button>' : ''}
+    <small class="muted">활동한 달 기준입니다. 예: 8월 활동 보고는 "8월"을 고르면 보이며, 제출은 9월 1~10일에 이루어집니다.</small>
+  </div>`;
+}
+function bindReportPeriodSelector(onChange) {
+  const sel = document.getElementById('period-select');
+  if (sel) sel.onchange = () => onChange(sel.value);
+  const now = document.getElementById('period-now');
+  if (now) now.onclick = () => onChange('');
+}
+
 // ---------- 봉사 보고 현황 (집단 감독자) ----------
-async function reportDashScreen() {
+async function reportDashScreen(selectedPeriod = '') {
   const g = myGroupKey();
   shell(`<h1>봉사 보고 현황</h1><p class="muted">불러오는 중…</p>`);
   try {
     const cfg = (await getDoc(doc(db, 'config', 'app'))).data() || {};
-    const period = cfg.reportPeriod || '';
+    const currentPeriod = cfg.reportPeriod || '';
+    const period = /^\d{4}-\d{2}$/.test(selectedPeriod) ? selectedPeriod : currentPeriod;
     const msnap = await getDocs(collection(db, 'groups', g, 'members'));
     const members = [];
     msnap.forEach((d) => { const v = d.data(); if (v.active !== false) members.push({ id: d.id, ...v }); });
@@ -871,12 +907,14 @@ async function reportDashScreen() {
     shell(`
       <p class="eyebrow">${esc(GROUP_LABELS[g] || g)} 감독자·보조자</p>
       <h1>봉사 보고 현황</h1>
+      ${reportPeriodSelectorHtml(period, currentPeriod)}
       <p class="sum">${esc(plabel)} · 제출 <b>${submitted.size}</b> / 성원 ${members.length} · 미제출 <b>${miss.length}</b></p>
       ${miss.length ? `<button class="primary" id="copy">미제출자 이름 복사 (${miss.length})</button>` : ''}
       <div class="rlist">${detailRows || '<p class="muted">명단이 없습니다.</p>'}</div>
       <button class="link" id="back">← 뒤로</button>
     `);
     backBtn();
+    bindReportPeriodSelector((p) => reportDashScreen(p));
     const cp = document.getElementById('copy');
     if (cp) cp.onclick = async () => {
       try { await navigator.clipboard.writeText(miss.map((m) => m.name).join(', ')); cp.textContent = '복사됨 ✓'; }
@@ -1804,11 +1842,12 @@ async function importContactsFromXlsx(file) {
 }
 
 // ---------- 회중 서기 전체 보고 현황 ----------
-async function secretaryScreen() {
+async function secretaryScreen(selectedPeriod = '') {
   shell(`<h1>회중 봉사 보고 현황</h1><p class="muted">불러오는 중…</p>`);
   try {
     const cfg = (await getDoc(doc(db, 'config', 'app'))).data() || {};
-    const period = cfg.reportPeriod || '';
+    const currentPeriod = cfg.reportPeriod || '';
+    const period = /^\d{4}-\d{2}$/.test(selectedPeriod) ? selectedPeriod : currentPeriod;
     const pm = /^(\d{4})-(\d{2})$/.exec(period);
     const plabel = pm ? `${pm[1]}년 ${Number(pm[2])}월` : period || '(보고월 미설정)';
     const groups = Object.keys(GROUP_LABELS);
@@ -1883,6 +1922,7 @@ async function secretaryScreen() {
     shell(`
       <p class="eyebrow">회중 서기</p>
       <h1>회중 봉사 보고 현황</h1>
+      ${reportPeriodSelectorHtml(period, currentPeriod)}
       <p class="sum">${esc(plabel)} · 전체 제출 <b>${totalS}</b> / 성원 ${totalM} · 미제출 <b>${totalM - totalS}</b></p>
       <button class="primary" id="export-report-xlsx">엑셀 파일 다운로드</button>
       <div class="rlist">${blocks.join('')}</div>
@@ -1890,6 +1930,7 @@ async function secretaryScreen() {
     `);
     const exportBtn = document.getElementById('export-report-xlsx');
     if (exportBtn) exportBtn.onclick = () => downloadSecretaryReportWorkbook(exportRows, groupSummaryRows, plabel);
+    bindReportPeriodSelector((p) => secretaryScreen(p));
     backBtn();
   } catch (e) {
     shell(`<h1>회중 봉사 보고 현황</h1><p class="err">${esc(e.message)}</p><button class="link" id="back">← 뒤로</button>`); backBtn();
