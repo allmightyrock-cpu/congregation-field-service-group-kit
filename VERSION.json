@@ -1,9 +1,10 @@
 {
   "name": "Congregation Field Service Group Kit",
-  "version": "2026.09.07-installer-v2",
-  "date": "2026-09-07",
+  "version": "2026.10.05-installer-v2.1",
+  "date": "2026-10-05",
   "channel": "distribution",
   "notes": [
+    "Fix: Cloudflare sign-in no longer fails with \"login succeeded but token not found\" on PCs that never used wrangler (token file is now searched in all wrangler config locations)",
     "New installer: double-click 설치.cmd / 설치.command, no Node.js pre-install (portable runtime downloaded on first run)",
     "Local web installer (9 screens): Google sign-in → Firebase project/Firestore/web app/config auto, service-account key auto, Cloudflare sign-in → Worker+secret+Pages deploy, verification, resume on re-run",
     "Fixes: Worker secret FIREBASE_SERVICE_ACCOUNT now set during install; firestore.rules BOM removed; editor group order follows Firestore groups",

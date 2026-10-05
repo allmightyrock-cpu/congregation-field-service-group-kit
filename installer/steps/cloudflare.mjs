@@ -13,23 +13,47 @@ import { openBrowser } from '../lib/open.mjs';
 export const PROFILE = 'fsg-installer';
 const CF_API = 'https://api.cloudflare.com/client/v4';
 
-// 명명된 auth 프로필 파일 위치는 wrangler 버전에 따라 다를 수 있어 config 폴더 안에서 이름으로 찾는다
+// wrangler 의 전역 설정 폴더: 홈에 `.wrangler` 폴더가 이미 있으면 그것을, 없으면(Cloudflare 를 처음 쓰는 PC) OS별 표준 위치를 쓴다.
+//   Windows: %APPDATA%\xdg.config\.wrangler   Mac: ~/Library/Preferences/.wrangler   Linux: ~/.config/.wrangler
+// 어느 쪽에 만들어졌는지 PC마다 달라서 후보를 모두 확인한다.
+function wranglerConfigRoots() {
+  const home = os.homedir();
+  const roots = [path.join(home, '.wrangler')];
+  const xdg = process.env.XDG_CONFIG_HOME;
+  if (xdg) roots.push(path.join(xdg, '.wrangler'));
+  if (process.platform === 'win32') {
+    roots.push(path.join(process.env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'xdg.config', '.wrangler'));
+  } else if (process.platform === 'darwin') {
+    roots.push(path.join(home, 'Library', 'Preferences', '.wrangler'));
+  } else {
+    roots.push(path.join(home, '.config', '.wrangler'));
+  }
+  return [...new Set(roots)];
+}
+function profileTomlCandidates() {
+  const out = [];
+  for (const r of wranglerConfigRoots()) {
+    out.push(path.join(r, 'config', `${PROFILE}.toml`), path.join(r, 'config', 'profiles', `${PROFILE}.toml`));
+  }
+  return out;
+}
+// 파일 위치는 wrangler 버전에 따라 다를 수 있어, 후보에 없으면 config 폴더 안에서 이름으로 한 번 더 찾는다
 function profileTomlPath() {
-  const root = path.join(os.homedir(), '.wrangler', 'config');
-  const cands = [path.join(root, `${PROFILE}.toml`), path.join(root, 'profiles', `${PROFILE}.toml`)];
+  const cands = profileTomlCandidates();
   for (const c of cands) if (fs.existsSync(c)) return c;
-  try {
-    const walk = (d, depth) => {
-      if (depth > 3) return '';
-      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-        const p = path.join(d, e.name);
-        if (e.isDirectory()) { const r = walk(p, depth + 1); if (r) return r; }
-        else if (e.isFile() && e.name.toLowerCase() === `${PROFILE}.toml`) return p;
-      }
-      return '';
-    };
-    return walk(root, 0) || cands[0];
-  } catch { return cands[0]; }
+  const walk = (d, depth) => {
+    if (depth > 3) return '';
+    let list;
+    try { list = fs.readdirSync(d, { withFileTypes: true }); } catch { return ''; }
+    for (const e of list) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) { const r = walk(p, depth + 1); if (r) return r; }
+      else if (e.isFile() && e.name.toLowerCase() === `${PROFILE}.toml`) return p;
+    }
+    return '';
+  };
+  for (const r of wranglerConfigRoots()) { const f = walk(path.join(r, 'config'), 0); if (f) return f; }
+  return cands[0];
 }
 export function readProfileToken() {
   try {
@@ -87,7 +111,7 @@ export async function cfLogin(ctx, body, report) {
       throw new InstallError('CF_LOGIN', 'Cloudflare 로그인이 끝나지 않았어요. 브라우저에서 로그인과 Allow 를 마친 뒤 다시 시도하세요.', { detail: res.out.slice(-600) });
     }
     token = readProfileToken();
-    if (!token) throw new InstallError('CF_LOGIN', '로그인은 됐지만 토큰을 찾지 못했어요. 다시 시도하세요.', { detail: profileTomlPath() });
+    if (!token) throw new InstallError('CF_LOGIN', '로그인은 됐지만 토큰을 찾지 못했어요. 다시 시도하세요.', { detail: `찾아본 위치:\n${profileTomlCandidates().join('\n')}` });
     const u = await cfApi(token, '/user');
     if (!u.ok) throw new InstallError('CF_LOGIN', 'Cloudflare 사용자 정보를 확인하지 못했어요. 다시 로그인하세요.', { actions: [{ id: 'relogin', label: '다시 로그인' }] });
     user = u.data.result;
