@@ -155,7 +155,7 @@ service cloud.firestore {
     function validNoticeItem(k) {
       let d = request.resource.data;
       return d.keys().hasOnly(['parentKey','title','subtitle','bodyHtml','bodyJson','plainText',
-                               'visible','urgent','pinned','deletedAt','updatedBy','updatedAt','createdAt'])
+                               'visible','urgent','pinned','expiresAt','deletedAt','updatedBy','updatedAt','createdAt'])
         && d.parentKey == k
         && d.title is string && d.title.size() <= 120
         && d.visible is bool
@@ -165,6 +165,8 @@ service cloud.firestore {
         && (!('bodyJson' in d) || ((d.bodyJson is string && d.bodyJson.size() <= 120000) || d.bodyJson is map))
         && (!('urgent' in d) || d.urgent is bool)
         && (!('pinned' in d) || d.pinned is bool)
+        // 게시 종료일(회중 광고 만료): 날짜 또는 null(만료 없음). 만료는 성원 화면에서 걸러 낸다.
+        && (!('expiresAt' in d) || d.expiresAt == null || d.expiresAt is timestamp)
         && (!('deletedAt' in d) || d.deletedAt is timestamp)
         && (!('createdAt' in d) || d.createdAt is timestamp)
         && (!('updatedAt' in d) || d.updatedAt is timestamp)
