@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { getAccessToken } from '../worker/src/oauth.js';
 import { makeCredential } from '../worker/src/pin.js';
 import { resolveReportConfig } from '../shared/report-period.js';
+import { groupClaims, fixGroupClaims } from './group-claims.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const templatesDir = process.env.TEMPLATE_DIR || resolve(ROOT, 'templates');
@@ -29,6 +30,9 @@ if (process.env.SEED_SKIP_IF_INITIALIZED === '1') {
   const chk = await fetch(`${base}/config/app`, { headers: { authorization: `Bearer ${accessToken}` } });
   if (chk.ok) {
     console.log(`이미 초기화된 프로젝트입니다(config/app 있음): ${projectId} — 초기 데이터 등록을 건너뜁니다.`);
+    // 예전 버전이 만든 집단 감독자 권한(우리 집단 소식·봉사 보고 대리 제출 불가)을 바로잡는다. PIN 은 그대로 둔다.
+    const fixed = await fixGroupClaims({ base, token: accessToken, log: (m) => console.log(m) });
+    if (fixed) console.log(`집단 감독자 권한 ${fixed}건을 보정했습니다. 해당 감독자는 로그아웃 후 다시 로그인해야 적용됩니다.`);
     process.exit(0);
   }
   if (chk.status !== 404) throw new Error(`config/app 확인 실패: ${chk.status} ${await chk.text()}`);
@@ -209,15 +213,7 @@ for (const r of roles) {
 }
 
 for (const g of groups) {
-  const claims = {
-    kind: 'editor',
-    role: 'group',
-    groupKeys: [g.key],
-    canReadReports: [g.key],
-    noticeKeys: ['groupnews'],
-    canReadContacts: true,
-    canWriteContacts: true
-  };
+  const claims = groupClaims(g.key);
   const cred = await makeCredential('0000');
   await put(`pinCredentials/group-${g.key}`, {
     scope: 'group',
