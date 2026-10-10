@@ -2463,6 +2463,7 @@ async function publishRosterImage() {
 }
 
 async function captureRosterDataUrl(board) {
+  // SVG(foreignObject)는 XML 로 읽히므로 outerHTML 의 <br>·&nbsp; 가 있으면 이미지가 만들어지지 않는다 → XMLSerializer 로 직렬화
   const clone = board.cloneNode(true);
   clone.querySelectorAll('button').forEach((button) => {
     const span = document.createElement('span');
@@ -2486,7 +2487,7 @@ async function captureRosterDataUrl(board) {
         .member-only{font-size:21px;font-weight:800}
         .roster-leader{background:#eef2f7!important}.empty{background:#fff}
       </style>
-      ${clone.outerHTML}
+      ${new XMLSerializer().serializeToString(clone)}
     </div>`;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
     <foreignObject width="100%" height="100%">${html}</foreignObject>

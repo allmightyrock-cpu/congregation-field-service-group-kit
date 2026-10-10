@@ -1,9 +1,10 @@
 {
   "name": "Congregation Field Service Group Kit",
-  "version": "2026.10.07-installer-v2.3",
-  "date": "2026-10-07",
+  "version": "2026.10.10-installer-v2.4",
+  "date": "2026-10-10",
   "channel": "distribution",
   "notes": [
+    "Fix: 집단 편성표 [성원 앱에 게시] failed with \"편성표 이미지를 만들지 못했습니다\" (SVG image build) — fixed; members saw \"내용이 없습니다\" until re-published",
     "Fix: saving a 회중 광고 post failed with a permissions error because the rules did not allow the post expiry date (expiresAt) — rules updated; existing installs get it on 업데이트",
     "Fix: group overseer login could not post to 우리 집단 소식 (\"Missing or insufficient permissions\"), submit reports on behalf of members or use 양치는 일 records — group claims now match firestore.rules; existing installs are repaired automatically on 업데이트 (PINs unchanged; overseers must log in again). Group overseers no longer get edit access to the whole address book.",
     "Fix: Cloudflare sign-in no longer fails with \"login succeeded but token not found\" on PCs that never used wrangler (token file is now searched in all wrangler config locations)",
