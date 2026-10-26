@@ -152,6 +152,14 @@ export async function getBoard(groupKey) {
   return s.exists() ? s.data() : null;
 }
 
+// 우리 집단 게시물 첨부 이미지 (boards/{g}/posts/{id}/pages)
+export async function getGroupPostPages(groupKey, postId) {
+  const snap = await getDocs(query(collection(db, 'boards', groupKey, 'posts', postId, 'pages'), orderBy('index')));
+  const arr = [];
+  snap.forEach((d) => arr.push(d.data()));
+  return arr;
+}
+
 // 우리 집단 다건 게시물(최신 주차 먼저)
 export async function getGroupPosts(groupKey) {
   const snap = await getDocs(query(collection(db, 'boards', groupKey, 'posts'), orderBy('sort', 'desc')));

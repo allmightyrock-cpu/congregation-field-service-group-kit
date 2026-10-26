@@ -1,7 +1,7 @@
 ﻿import './styles.css';
 import {
   memberSignIn, getGroup, getGroups, getConfig, getMembers, submitReport, getNotices, getNoticePages,
-  getCongNoticeItems, getCongNoticeItemPages, getTalks, getVisits, getBoard, getGroupPosts
+  getCongNoticeItems, getCongNoticeItemPages, getTalks, getVisits, getBoard, getGroupPosts, getGroupPostPages
 } from './data.js';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth, WORKER_URL, CONFIG_MISSING } from './firebase.js';
@@ -1689,10 +1689,20 @@ async function openGroupNewsNotice(n) {
       ${fromList ? '<button class="link" id="tolist">← 목록으로</button>' : ''}
       <h1 class="post-title">${esc(p.title || title)}</h1>
       <div class="body post-body">${asBody(p.body)}</div>
+      <div id="post-pages"></div>
       ${backButtonHtml('list')}`);
     bindNav();
     const tolist = document.getElementById('tolist');
     if (tolist) tolist.onclick = renderList;
+    // 첨부 이미지(포스터·사진) — 글을 먼저 보여 주고 이미지는 뒤따라 채운다
+    if (p.id && p.id !== '__news__') {
+      getGroupPostPages(state.g, p.id).then((pages) => {
+        const box = document.getElementById('post-pages');
+        if (!box || !pages.length) return;
+        box.innerHTML = `<div class="notice-pages">${pages.map((pg) =>
+          `<img src="${esc(pg.dataUrl)}" alt="첨부 이미지" />`).join('')}</div>`;
+      }).catch(() => {});
+    }
   };
 
   if (items.length <= 1) renderDetail(items[0] || { title, body: '' }, false);

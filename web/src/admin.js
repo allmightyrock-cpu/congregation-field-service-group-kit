@@ -998,7 +998,11 @@ async function boardEditScreen(msg = '') {
   document.querySelectorAll('[data-edit]').forEach((b) => b.onclick = () =>
     boardPostForm(g, posts.find((p) => p.id === b.dataset.edit)));
   document.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => {
-    if (!confirm('이 게시물을 삭제할까요?')) return;
+    if (!confirm('이 게시물을 삭제할까요? 첨부 이미지도 함께 삭제됩니다.')) return;
+    try {
+      const pg = await getDocs(collection(db, 'boards', g, 'posts', b.dataset.del, 'pages'));
+      for (const d of pg.docs) await deleteDoc(d.ref);
+    } catch {}
     await deleteDoc(doc(db, 'boards', g, 'posts', b.dataset.del));
     boardEditScreen('삭제되었습니다.');
   });
@@ -1021,9 +1025,12 @@ function boardPostForm(g, p) {
     <textarea id="p_body" placeholder="게시물 내용">${esc((p && p.body) || '')}</textarea>
     <button class="primary" id="save">저장</button>
     <p id="msg" class="savemsg"></p>
+    <div id="post-pages"></div>
     <button class="link" id="back2">← 목록</button>
   `);
   document.getElementById('back2').onclick = () => boardEditScreen();
+  if (editing) renderBoardPostPages(g, p.id);
+  else document.getElementById('post-pages').innerHTML = '<p class="muted">사진·포스터 첨부는 먼저 저장한 뒤 사용할 수 있습니다.</p>';
   document.getElementById('save').onclick = async () => {
     const title = document.getElementById('p_title').value.trim();
     const body = document.getElementById('p_body').value;
@@ -1042,12 +1049,68 @@ function boardPostForm(g, p) {
         createdAt: (p && p.createdAt) || serverTimestamp(),
         updatedAt: serverTimestamp(), updatedBy: session.uid
       });
+      if (!editing) {
+        // 새 글은 저장 직후 같은 화면(수정 모드)으로 열어 사진·포스터를 바로 붙일 수 있게 한다
+        boardPostForm(g, { id, title, body, sort });
+        const m = document.getElementById('msg'); if (m) m.textContent = '저장되었습니다. 아래에서 사진·포스터를 추가할 수 있습니다.';
+        return;
+      }
       boardEditScreen('저장되었습니다.');
     } catch (e) {
       document.getElementById('save').disabled = false;
       msgEl.innerHTML = `<span class="err">저장 실패: ${esc(e.message)}</span>`;
     }
   };
+}
+
+// 우리 집단 소식 게시물 첨부 이미지 (boards/{g}/posts/{id}/pages/{번호})
+async function renderBoardPostPages(g, postId) {
+  const box = document.getElementById('post-pages');
+  if (!box) return;
+  box.innerHTML = '<p class="muted">첨부 이미지 확인 중…</p>';
+  try {
+    const snap = await getDocs(collection(db, 'boards', g, 'posts', postId, 'pages'));
+    const pages = sortNoticePages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    box.innerHTML = `
+      <h2 class="sec">첨부 이미지</h2>
+      <input type="file" id="board-image" accept="image/*" multiple hidden />
+      <button class="primary soft" id="add-board-image">🖼️ 사진/이미지 추가</button>
+      <div class="thumbs existing-thumbs">${pages.map((pg) => `
+        <div class="thumb">
+          <img src="${esc(pg.dataUrl)}" alt="첨부 이미지 ${esc(pg.index || pg.id)}" />
+          <span>${esc(pg.index || pg.id)}번 · ${Math.round(String(pg.dataUrl || '').length / 1024)}KB</span>
+          <button class="mini del" data-del-page="${esc(pg.id)}">이 이미지 제거</button>
+        </div>`).join('') || '<p class="muted">첨부 이미지가 없습니다.</p>'}</div>`;
+    document.getElementById('add-board-image').onclick = () => document.getElementById('board-image').click();
+    document.getElementById('board-image').onchange = (event) =>
+      event.target.files.length && appendBoardPostImages(g, postId, [...event.target.files]);
+    box.querySelectorAll('[data-del-page]').forEach((b) => {
+      b.onclick = async () => {
+        await deleteDoc(doc(db, 'boards', g, 'posts', postId, 'pages', b.dataset.delPage));
+        renderBoardPostPages(g, postId);
+      };
+    });
+  } catch (e) {
+    box.innerHTML = `<p class="err">첨부 이미지 확인 실패: ${esc(e.message)}</p>`;
+  }
+}
+
+async function appendBoardPostImages(g, postId, files) {
+  const box = document.getElementById('post-pages');
+  try {
+    box.insertAdjacentHTML('afterbegin', '<p class="muted">이미지를 올리는 중…</p>');
+    const snap = await getDocs(collection(db, 'boards', g, 'posts', postId, 'pages'));
+    let index = nextNoticePageIndex(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    for (const file of files) {
+      const { dataUrl } = await compressImage(file);
+      await setDoc(doc(db, 'boards', g, 'posts', postId, 'pages', String(index)),
+        { index, dataUrl, updatedBy: session.uid });
+      index += 1;
+    }
+    renderBoardPostPages(g, postId);
+  } catch (e) {
+    box.innerHTML = `<p class="err">이미지 추가 실패: ${esc(e.message)}</p>`;
+  }
 }
 
 // ---------- PDF 업로드 화면 ----------

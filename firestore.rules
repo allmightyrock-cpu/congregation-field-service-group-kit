@@ -344,6 +344,14 @@ service cloud.firestore {
                                || (isEditor() && inC('groupKeys', g));
         allow create, update: if isEditor() && inC('canWriteBoard', g) && validBoardPost();
         allow delete:         if isEditor() && inC('canWriteBoard', g);
+
+        // 게시물 첨부 이미지(압축 JPEG dataUrl) — 성원은 자기 집단 열람, 담당 편집자만 쓰기
+        match /pages/{p} {
+          allow read:           if (isMember() && myGroup() == g)
+                                 || (isEditor() && inC('groupKeys', g));
+          allow create, update: if isEditor() && inC('canWriteBoard', g) && validNoticePage();
+          allow delete:         if isEditor() && inC('canWriteBoard', g);
+        }
       }
     }
 
